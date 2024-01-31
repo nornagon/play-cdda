@@ -83,25 +83,17 @@ export default async function run({ github, context }) {
       if (f.isDirectory) continue;
       console.log(`${f.entryName} (${formatBytes(f.header.size)})`);
       // Create a blob
-      for (let retries = 0; retries < 3; retries++) {
-        try {
-          const blob = await github.rest.git.createBlob({
-            ...context.repo,
-            content: f.getData().toString("base64"),
-            encoding: "base64",
-          });
-          blobs.push({
-            path: pathBase + f.entryName,
-            mode,
-            type,
-            sha: blob.data.sha,
-          });
-          break;
-        } catch (e) {
-          console.error(`Error creating blob for ${f.entryName}`, e.message);
-        }
-        console.log("Retrying...");
-      }
+      const blob = await retry(() => github.rest.git.createBlob({
+        ...context.repo,
+        content: f.getData().toString("base64"),
+        encoding: "base64",
+      }));
+      blobs.push({
+        path: pathBase + f.entryName,
+        mode,
+        type,
+        sha: blob.data.sha,
+      });
     }
     console.groupEnd();
 
@@ -128,6 +120,18 @@ export default async function run({ github, context }) {
 
     return commit;
   }
+}
+
+// Function to automatically retry a promise
+async function retry(fn, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      console.error("Error", e.message, "- retrying...");
+    }
+  }
+  throw new Error("Max retries reached");
 }
 
 // Function for formatting a byte size to a human-readable string
