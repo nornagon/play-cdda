@@ -98,7 +98,7 @@ export default async function run({ github, context }) {
           });
           break;
         } catch (e) {
-          console.error(`Error creating blob for ${f.entryName}`, e);
+          console.error(`Error creating blob for ${f.entryName}`, e.message);
         }
         console.log("Retrying...");
       }
