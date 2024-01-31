@@ -83,17 +83,25 @@ export default async function run({ github, context }) {
       if (f.isDirectory) continue;
       console.log(`${f.entryName} (${formatBytes(f.header.size)})`);
       // Create a blob
-      const blob = await github.rest.git.createBlob({
-        ...context.repo,
-        content: f.getData().toString("base64"),
-        encoding: "base64",
-      });
-      blobs.push({
-        path: pathBase + f.entryName,
-        mode,
-        type,
-        sha: blob.data.sha,
-      });
+      for (let retries = 0; retries < 3; retries++) {
+        try {
+          const blob = await github.rest.git.createBlob({
+            ...context.repo,
+            content: f.getData().toString("base64"),
+            encoding: "base64",
+          });
+          blobs.push({
+            path: pathBase + f.entryName,
+            mode,
+            type,
+            sha: blob.data.sha,
+          });
+          break;
+        } catch (e) {
+          console.error(`Error creating blob for ${f.entryName}`, e);
+        }
+        console.log("Retrying...");
+      }
     }
     console.groupEnd();
 
