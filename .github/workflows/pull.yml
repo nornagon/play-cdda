@@ -19,4 +19,4 @@ jobs:
           script: |
             const { default: run } = await import('${{ github.workspace }}/pull.js')
 
-            await run({github})
+            await run({ github, context })
