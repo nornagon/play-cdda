@@ -28,19 +28,27 @@ export default async function run({ github, context }) {
       ref: "heads/gh-pages",
     })
     .then((r) => r.data.object.sha);
-  for (const rel of releases) {
-    const exists = files.find((f) => f.name === rel.tag_name);
-    if (!exists) {
-      baseCommit = await addRelease(rel, baseCommit);
+  const initialCommit = baseCommit;
+  try {
+    for (const rel of releases) {
+      const exists = files.find((f) => f.name === rel.tag_name);
+      if (!exists) {
+        baseCommit = await addRelease(rel, baseCommit);
+      }
+    }
+  } finally {
+    if (baseCommit === initialCommit) {
+      console.log("No releases added, skipping ref update");
+    } else {
+      console.log(`Updating gh-pages to ${baseCommit}...`);
+      // Update the reference
+      await github.rest.git.updateRef({
+        ...context.repo,
+        ref: "heads/gh-pages",
+        sha: baseCommit,
+      });
     }
   }
-  console.log(`Updating gh-pages to ${baseCommit}...`);
-  // Update the reference
-  await github.rest.git.updateRef({
-    ...context.repo,
-    ref: "heads/gh-pages",
-    sha: baseCommit,
-  });
 
   /**
    * @param {typeof releases[0]} rel
