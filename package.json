@@ -1,0 +1,11 @@
+{
+  "type": "module",
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/github-script": "github:actions/github-script",
+    "octokit": "^3.1.2"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.10"
+  }
+}
