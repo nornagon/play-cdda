@@ -95,7 +95,7 @@ export default async function run({ github, context }) {
         ...context.repo,
         content: f.getData().toString("base64"),
         encoding: "base64",
-      }));
+      }), 10);
       blobs.push({
         path: pathBase + f.entryName,
         mode,
@@ -137,6 +137,8 @@ async function retry(fn, retries = 3) {
       return await fn();
     } catch (e) {
       console.error("Error", e.message, "- retrying...");
+      // Wait an increasing amount of time between retries
+      await new Promise((r) => setTimeout(r, 1000 * i));
     }
   }
   throw new Error("Max retries reached");
