@@ -95,7 +95,7 @@ export default async function run({ github, context }) {
         ...context.repo,
         content: f.getData().toString("base64"),
         encoding: "base64",
-      }), 10);
+      }));
       blobs.push({
         path: pathBase + f.entryName,
         mode,
@@ -103,10 +103,22 @@ export default async function run({ github, context }) {
         sha: blob.data.sha,
       });
     }
+
+    // Update the root index.html to redirect to the latest version
+    const rootIndexBlob = await retry(() => github.rest.git.createBlob({
+      ...context.repo,
+      content: `<meta http-equiv="refresh" content="0;url=./v/${rel.tag_name}/" /><body><a href="./v/${rel.tag_name}/">Redirecting...</a></body>`,
+      encoding: "utf-8",
+    }));
+    blobs.push({
+      path: "index.html",
+      mode,
+      type,
+      sha: rootIndexBlob.data.sha,
+    });
     console.groupEnd();
 
     console.log("Creating tree and commit...");
-    // Create a tree
     const tree = await github.rest.git
       .createTree({
         ...context.repo,
@@ -114,8 +126,6 @@ export default async function run({ github, context }) {
         base_tree: baseTree,
       })
       .then((r) => r.data.sha);
-
-    // Create a commit
     const commit = await github.rest.git
       .createCommit({
         ...context.repo,
@@ -131,7 +141,7 @@ export default async function run({ github, context }) {
 }
 
 // Function to automatically retry a promise
-async function retry(fn, retries = 3) {
+async function retry(fn, retries = 10) {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
