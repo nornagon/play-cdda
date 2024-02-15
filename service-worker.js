@@ -8,24 +8,24 @@ const CURRENT_CACHES = {
 self.addEventListener('install', function(event) {
   self.skipWaiting();
 
-  /*
   event.waitUntil(
     caches.open(CURRENT_CACHES['harness']).then((cache) => {
       return cache.addAll([
         '/',
-        '/index.html',
-        '/harness.js',
-        '/harness.css',
         '/favicon.ico',
-        '/manifest.json',
+        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css",
+        "https://cdnjs.cloudflare.com/ajax/libs/screenfull.js/5.2.0/screenfull.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js",
       ]);
     })
   );
-  */
 });
 
 self.addEventListener('activate', function(event) {
   const expectedCacheNames = Object.values(CURRENT_CACHES);
+
+  event.waitUntil(clients.claim())
 
   event.waitUntil(
     caches.keys().then((cacheNames) => Promise.all(

@@ -187,6 +187,11 @@
     <script type="module">
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('service-worker.js');
+        await navigator.serviceWorker.ready;
+        await new Promise(resolve => {
+          if (navigator.serviceWorker.controller) return resolve();
+          navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+        })
       }
       const versionFromQueryString = new URLSearchParams(window.location.search).get('v')
 
