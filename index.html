@@ -185,6 +185,9 @@
     <div id="loading-message">Loading...</div>
 
     <script type="module">
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js');
+      }
       const versionFromQueryString = new URLSearchParams(window.location.search).get('v')
 
       async function getVersions() {
