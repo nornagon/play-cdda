@@ -3,12 +3,13 @@ import AdmZip from "adm-zip";
 
 /** @param {import('github-script').AsyncFunctionArguments} AsyncFunctionArguments */
 export default async function run({ github, context }) {
+  const dataBranch = "data";
   // Get all the files from the main branch on the current repo
   const { data: files } = await github.rest.repos
     .getContent({
       ...context.repo,
       path: "v",
-      ref: "gh-pages",
+      ref: dataBranch,
     })
     .catch(() => ({ data: [] }));
   if (!Array.isArray(files)) throw new Error("files was not an array");
@@ -25,7 +26,7 @@ export default async function run({ github, context }) {
   let baseCommit = await github.rest.git
     .getRef({
       ...context.repo,
-      ref: "heads/gh-pages",
+      ref: `heads/${dataBranch}`,
     })
     .then((r) => r.data.object.sha);
   const initialCommit = baseCommit;
@@ -40,11 +41,11 @@ export default async function run({ github, context }) {
     if (baseCommit === initialCommit) {
       console.log("No releases added, skipping ref update");
     } else {
-      console.log(`Updating gh-pages to ${baseCommit}...`);
+      console.log(`Updating ${dataBranch} to ${baseCommit}...`);
       // Update the reference
       await github.rest.git.updateRef({
         ...context.repo,
-        ref: "heads/gh-pages",
+        ref: `heads/${dataBranch}`,
         sha: baseCommit,
       });
     }
@@ -103,19 +104,6 @@ export default async function run({ github, context }) {
         sha: blob.data.sha,
       });
     }
-
-    // Update the root index.html to redirect to the latest version
-    const rootIndexBlob = await retry(() => github.rest.git.createBlob({
-      ...context.repo,
-      content: `<meta http-equiv="refresh" content="0;url=./v/${rel.tag_name}/" /><body><a href="./v/${rel.tag_name}/">Redirecting...</a></body>`,
-      encoding: "utf-8",
-    }));
-    blobs.push({
-      path: "index.html",
-      mode,
-      type,
-      sha: rootIndexBlob.data.sha,
-    });
     console.groupEnd();
 
     console.log("Creating tree and commit...");
@@ -140,7 +128,6 @@ export default async function run({ github, context }) {
   }
 }
 
-// Function to automatically retry a promise
 async function retry(fn, retries = 10) {
   for (let i = 0; i < retries; i++) {
     try {
@@ -154,7 +141,6 @@ async function retry(fn, retries = 10) {
   throw new Error("Max retries reached");
 }
 
-// Function for formatting a byte size to a human-readable string
 function formatBytes(bytes, decimals = 2) {
   if (bytes === 0) return "0 B";
   const k = 1024;
