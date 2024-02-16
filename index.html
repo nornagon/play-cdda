@@ -185,14 +185,11 @@
     <div id="loading-message">Loading...</div>
 
     <script type="module">
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('service-worker.js');
-        await navigator.serviceWorker.ready;
-        await new Promise(resolve => {
-          if (navigator.serviceWorker.controller) return resolve();
-          navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
-        })
-      }
+      navigator.serviceWorker.register('service-worker.js');
+      await new Promise(resolve => {
+        if (navigator.serviceWorker.controller) return resolve();
+        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+      })
       const versionFromQueryString = new URLSearchParams(window.location.search).get('v')
 
       async function getVersions() {
@@ -319,14 +316,9 @@
         if (window.game_unsaved)
           e.preventDefault();
       }
-      fetch(`https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/cataclysm-tiles.js`).then((response) => {
-        response.text().then((text) => {
-          const script = document.createElement("script");
-          script.type = "text/javascript";
-          script.text = text;
-          document.body.appendChild(script);
-        });
-      });
+      const script = document.createElement("script");
+      script.src = `https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/cataclysm-tiles.js`;
+      document.body.appendChild(script);
     </script>
   </body>
 </html>

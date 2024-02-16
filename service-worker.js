@@ -45,8 +45,29 @@ self.addEventListener('fetch', function(event) {
             return cachedResponse;
           }
 
-          const response = await fetch(event.request.clone());
+          let response = await fetch(event.request.clone());
           if (response.status < 400 && event.request.url.startsWith('https://raw.githubusercontent.com/')) {
+            // raw.githubusercontent.com doesn't set the right MIME types,
+            // but we can fix that :)
+            // Without this, CORB will block the JS and WASM won't be able to
+            // stream-compile.
+            if (event.request.url.endsWith('.wasm')) {
+              const headers = new Headers(response.headers);
+              headers.set('Content-Type', 'application/wasm');
+              response = new Response(response.body, {
+                headers,
+                status: response.status,
+                statusText: response.statusText,
+              })
+            } else if (event.request.url.endsWith('.js')) {
+              const headers = new Headers(response.headers);
+              headers.set('Content-Type', 'application/javascript');
+              response = new Response(response.body, {
+                headers,
+                status: response.status,
+                statusText: response.statusText,
+              })
+            }
             cache.put(event.request, response.clone());
             // Cap the cache at 30. Each version has 3 files, so this is 10
             // versions. Each version is about 100 MB, so this is about 1 GB.
