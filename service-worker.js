@@ -11,8 +11,8 @@ self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CURRENT_CACHES['harness']).then((cache) => {
       return cache.addAll([
-        '/',
-        '/favicon.ico',
+        './',
+        './favicon.ico',
         "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css",
         "https://cdnjs.cloudflare.com/ajax/libs/screenfull.js/5.2.0/screenfull.min.js",
         "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js",
