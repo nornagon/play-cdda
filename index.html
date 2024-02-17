@@ -185,7 +185,9 @@
     <div id="loading-message">Loading...</div>
 
     <script type="module">
-      navigator.serviceWorker.register('service-worker.js');
+      navigator.serviceWorker.register('service-worker.js', {
+        scope: "./"
+      });
       await new Promise(resolve => {
         if (navigator.serviceWorker.controller) return resolve();
         navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
@@ -318,6 +320,7 @@
       }
       const script = document.createElement("script");
       script.src = `https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/cataclysm-tiles.js`;
+      script.crossOrigin = "anonymous";
       document.body.appendChild(script);
     </script>
   </body>
