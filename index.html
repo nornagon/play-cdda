@@ -285,6 +285,13 @@
         })(),
         setStatus: function (text) {
           if (text) {
+            const m = /^Downloading data... \((\d+)\/(\d+)\)$/.exec(text)
+            if (m) {
+              // Convert m[1] and m[2] to megabytes
+              const downloaded = parseInt(m[1], 10) / 1024 / 1024
+              const total = parseInt(m[2], 10) / 1024 / 1024
+              text = `Downloading data... (${downloaded.toFixed(2)}/${total.toFixed(2)} MB)`
+            }
             loadingMessage.innerHTML = text;
           } else {
             loadingMessage.innerHTML = "Starting...";
