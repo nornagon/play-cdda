@@ -318,16 +318,20 @@
         if (window.game_unsaved)
           e.preventDefault();
       }
-      const script = document.createElement("script");
-      script.src = `https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/cataclysm-tiles.data.js`;
-      script.async = true
-      script.crossOrigin = "anonymous";
-      document.body.appendChild(script);
-      const script = document.createElement("script");
-      script.src = `https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/cataclysm-tiles.js`;
-      script.async = true
-      script.crossOrigin = "anonymous";
-      document.body.appendChild(script);
+      {
+        const script = document.createElement("script");
+        script.src = `https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/cataclysm-tiles.data.js`;
+        script.async = true
+        script.crossOrigin = "anonymous";
+        document.body.appendChild(script);
+      }
+      {
+        const script = document.createElement("script");
+        script.src = `https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/cataclysm-tiles.js`;
+        script.async = true
+        script.crossOrigin = "anonymous";
+        document.body.appendChild(script);
+      }
     </script>
   </body>
 </html>
