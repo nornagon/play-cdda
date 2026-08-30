@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CDDA Web Publisher <noreply@example.com>
+Date: Sun, 30 Aug 2026 12:00:00 -0700
+Subject: [PATCH 6/6] Fix Emscripten Clang warning flags
+
+Emscripten uses Clang, so select the Makefile's Clang warning handling even
+when the host compiler defaults to GCC.  Also pass the common Emscripten flags
+to C compilation so the SDL3 port's experimental warning is treated the same
+way for C and C++ sources.
+---
+ Makefile                          | 1 +
+ build-scripts/build-emscripten.sh | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -712,6 +712,7 @@ ifeq ($(NATIVE), emscripten)
+     EMCC_COMMON_FLAGS += -g
+   endif
+ 
++  CFLAGS += $(EMCC_COMMON_FLAGS)
+   CXXFLAGS += $(EMCC_COMMON_FLAGS)
+   LDFLAGS += $(EMCC_COMMON_FLAGS)
+ 
+diff --git a/build-scripts/build-emscripten.sh b/build-scripts/build-emscripten.sh
+--- a/build-scripts/build-emscripten.sh
++++ b/build-scripts/build-emscripten.sh
+@@ -30,3 +30,3 @@ emsdk install "$EMSDK_VERSION"
+ emsdk activate "$EMSDK_VERSION"
+ 
+-make -j"$JOBS" NATIVE=emscripten BACKTRACE=0 TILES=1 TESTS=0 RUNTESTS=0 RELEASE=1 CCACHE="$CCACHE" LINTJSON=0 cataclysm-tiles.js
++make -j"$JOBS" NATIVE=emscripten CLANG=1 BACKTRACE=0 TILES=1 TESTS=0 RUNTESTS=0 RELEASE=1 CCACHE="$CCACHE" LINTJSON=0 cataclysm-tiles.js
+-- 
+2.51.0
