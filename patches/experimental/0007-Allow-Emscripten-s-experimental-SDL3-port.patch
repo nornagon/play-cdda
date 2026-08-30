@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CDDA Web Publisher <noreply@example.com>
+Date: Sun, 30 Aug 2026 12:15:00 -0700
+Subject: [PATCH 7/7] Allow Emscripten's experimental SDL3 port
+
+Emscripten processes its own warning controls in command-line order.  Keep
+warnings-as-errors for the build, but disable the expected SDL3 port warning
+after -Werror has been added.
+---
+ Makefile | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -119,6 +119,7 @@ CXX_WARNINGS = \
+ ifeq ($(NATIVE), emscripten)
+   # The EM_ASM macro triggers this warning.
+   WARNINGS += -Wno-gnu-zero-variadic-macro-arguments
++  WARNINGS += -Wno-experimental
+ endif
+ # Uncomment below to disable warnings
+ #WARNINGS = -w
+-- 
+2.51.0
