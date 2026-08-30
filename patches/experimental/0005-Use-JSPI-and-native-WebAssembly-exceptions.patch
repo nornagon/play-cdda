@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CDDA Web Publisher <noreply@example.com>
+Date: Sun, 30 Aug 2026 10:00:00 -0700
+Subject: [PATCH 5/5] Use JSPI and native WebAssembly exceptions
+
+Avoid Binaryen's whole-program Asyncify rewrite and the legacy JavaScript
+exception invoke thunks.  This substantially reduces browser link time and
+peak memory, while retaining synchronous-looking C++ at the actual suspension
+points.
+---
+ Makefile | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 76d654a7a4..d4427d2e02 100644
+--- a/Makefile
++++ b/Makefile
+@@ -700,7 +700,7 @@ ifeq ($(NATIVE), emscripten)
+   endif
+ 
+   # Flags that are common across compile and link phases.
+-  EMCC_COMMON_FLAGS = -sUSE_SDL=3 -sUSE_SDL_TTF=3 -fexceptions -Wno-error=experimental -Wno-unused-but-set-global -Wno-unused-function -Wno-unused-template
++  EMCC_COMMON_FLAGS = -sUSE_SDL=3 -sUSE_SDL_TTF=3 -fwasm-exceptions -Wno-error=experimental -Wno-unused-but-set-global -Wno-unused-function -Wno-unused-template
+ 
+   ifndef EMSCRIPTEN_SDL3_IMAGE_PREFIX
+     $(error EMSCRIPTEN_SDL3_IMAGE_PREFIX must point to a WebAssembly SDL3_image installation)
+@@ -721,8 +721,7 @@ ifeq ($(NATIVE), emscripten)
+   LDFLAGS += -sMAXIMUM_MEMORY=4GB
+   LDFLAGS += -sALLOW_MEMORY_GROWTH
+   LDFLAGS += -sSTACK_SIZE=262144
+-  LDFLAGS += -sASYNCIFY
+-  LDFLAGS += -sASYNCIFY_STACK_SIZE=16384
++  LDFLAGS += -sJSPI
+   LDFLAGS += -sENVIRONMENT=web
+   LDFLAGS += -lidbfs.js
+   LDFLAGS += -lembind
