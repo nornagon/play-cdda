@@ -2,11 +2,32 @@ const RELEASE_CACHE_PREFIX = 'game-data-release-v2-';
 const MAX_CACHED_RELEASES = 5;
 
 const CURRENT_CACHES = {
-  'harness': 'harness-v2',
-  'shared-game-data': 'shared-game-data-v2',
+  'harness': 'harness-v3',
+  'shared-game-data': 'shared-game-data-v3',
   'release-metadata': 'release-metadata-v2',
   'github-api': 'github-api-v1',
 };
+
+function isChannelManifestRequest(request) {
+  const url = new URL(request.url);
+  return url.origin === 'https://raw.githubusercontent.com' &&
+    url.pathname === '/nornagon/play-cdda/data/channels.json';
+}
+
+async function getChannelManifestResponse(request) {
+  const cache = await caches.open(CURRENT_CACHES['shared-game-data']);
+  try {
+    const response = await fetch(request.clone());
+    if (response.status < 400) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw error;
+  }
+}
 
 function releaseForRequest(request) {
   const url = new URL(request.url);
@@ -133,7 +154,9 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
-  if (event.request.url.startsWith('https://raw.githubusercontent.com/')) {
+  if (isChannelManifestRequest(event.request)) {
+    event.respondWith(getChannelManifestResponse(event.request));
+  } else if (event.request.url.startsWith('https://raw.githubusercontent.com/')) {
     const responsePromise = getGameDataResponse(event.request);
     event.respondWith(
       responsePromise

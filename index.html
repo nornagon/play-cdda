@@ -100,6 +100,26 @@
         opacity: 1;
       }
 
+      .menu-field {
+        font-family: Terminus, monospace;
+        font-size: 18px;
+        opacity: 0.9;
+      }
+
+      #channel-select {
+        font: inherit;
+        margin-left: 0.7em;
+      }
+
+      #version-label {
+        display: block;
+        margin-top: 0.4em;
+        max-width: 24em;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+        opacity: 0.7;
+      }
+
       a {
         color: white;
         text-decoration: none;
@@ -147,6 +167,18 @@
   <body>
     <div id="settings-gear"><i class="fa-solid fa-gear"></i></div>
     <div id="settings-menu" style="display: none">
+      <div class="menu-field" style="margin-bottom: 15px">
+        <label for="channel-select">
+          <i class="fa-solid fa-code-branch"></i>
+          <span style="margin-left: 0.7em">Build</span>
+        </label>
+        <select id="channel-select">
+          <option value="stable">Stable</option>
+          <option value="prerelease">Prerelease</option>
+          <option value="experimental">Experimental</option>
+        </select>
+        <span id="version-label"></span>
+      </div>
       <div style="margin-bottom: 10px">
         <div id="toggle-fullscreen" class="menu-button">
           <i class="fa-solid fa-expand"></i
@@ -192,7 +224,15 @@
         if (navigator.serviceWorker.controller) return resolve();
         navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
       })
-      const versionFromQueryString = new URLSearchParams(window.location.search).get('v')
+      const DATA_ROOT = 'https://raw.githubusercontent.com/nornagon/play-cdda/data'
+      const query = new URLSearchParams(window.location.search)
+      const versionFromQueryString = query.get('v')
+      const requestedChannel = query.get('channel') || 'experimental'
+      const knownChannels = ['stable', 'prerelease', 'experimental']
+
+      if (!knownChannels.includes(requestedChannel)) {
+        throw new Error(`Unknown build channel: ${requestedChannel}`)
+      }
 
       async function getVersions() {
         const dataTree = await fetch('https://api.github.com/repos/nornagon/play-cdda/git/trees/data').then(r => r.json())
@@ -205,12 +245,54 @@
         return versions[versions.length - 1]
       }
 
-      const version = versionFromQueryString || await getLatestExperimental()
+      async function resolveVersion() {
+        if (versionFromQueryString) {
+          return { version: versionFromQueryString, channel: null }
+        }
+        try {
+          const response = await fetch(`${DATA_ROOT}/channels.json`, { cache: 'no-cache' })
+          if (!response.ok) throw new Error(`${response.status}: ${response.url}`)
+          const manifest = await response.json()
+          const channel = manifest.channels?.[requestedChannel]
+          if (!channel?.version) throw new Error(`No published ${requestedChannel} build`)
+          return { version: channel.version, channel: requestedChannel }
+        } catch (error) {
+          console.warn('Channel manifest unavailable; using the legacy latest build', error)
+          return { version: await getLatestExperimental(), channel: 'experimental' }
+        }
+      }
+
+      const resolved = await resolveVersion()
+      const version = resolved.version
       const canvas = document.getElementById("canvas");
       const loadingMessage = document.getElementById("loading-message");
       const settingsMenu = document.getElementById("settings-menu");
+      const channelSelect = document.getElementById("channel-select");
+      const versionLabel = document.getElementById("version-label");
       let menuReady = false;
       let tilesetDownloadActive = false;
+
+      if (resolved.channel) {
+        channelSelect.value = resolved.channel
+      } else {
+        const pinned = document.createElement('option')
+        pinned.value = 'pinned'
+        pinned.textContent = 'Pinned version'
+        channelSelect.appendChild(pinned)
+        channelSelect.value = 'pinned'
+      }
+      versionLabel.textContent = version
+      channelSelect.onchange = () => {
+        if (channelSelect.value === 'pinned') return
+        if (!window.confirm('Switch builds and reload? Saves are shared across channels; older builds may not be able to read newer saves.')) {
+          channelSelect.value = resolved.channel || 'pinned'
+          return
+        }
+        const nextQuery = new URLSearchParams(window.location.search)
+        nextQuery.delete('v')
+        nextQuery.set('channel', channelSelect.value)
+        window.location.search = nextQuery
+      }
 
       window.addEventListener("menuready", () => {
         menuReady = true;
@@ -333,7 +415,7 @@
           );
         },
         locateFile(path) {
-          return `https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/${path}`
+          return `${DATA_ROOT}/v/${version}/${path}`
         },
       };
       Module.setStatus("Downloading...");
@@ -346,14 +428,14 @@
       }
       {
         const script = document.createElement("script");
-        script.src = `https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/cataclysm-tiles.data.js`;
+        script.src = `${DATA_ROOT}/v/${version}/cataclysm-tiles.data.js`;
         script.async = true
         script.crossOrigin = "anonymous";
         document.body.appendChild(script);
       }
       {
         const script = document.createElement("script");
-        script.src = `https://raw.githubusercontent.com/nornagon/play-cdda/data/v/${version}/cataclysm-tiles.js`;
+        script.src = `${DATA_ROOT}/v/${version}/cataclysm-tiles.js`;
         script.async = true
         script.crossOrigin = "anonymous";
         document.body.appendChild(script);
