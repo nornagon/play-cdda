@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CDDA Web Publisher <noreply@example.com>
+Date: Sun, 30 Aug 2026 16:05:00 -0700
+Subject: [PATCH 9/9] Use OpenGL ES renderer in browser
+
+Emscripten's SDL3 port provides the opengles2 renderer, not the desktop
+opengl renderer.  Include it as the accelerated fallback after SDL's GPU
+renderer so browser builds use WebGL instead of silently dropping to the
+software renderer.
+---
+ src/sdltiles.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/sdltiles.cpp b/src/sdltiles.cpp
+index cb757688ed..242e737c2e 100644
+--- a/src/sdltiles.cpp
++++ b/src/sdltiles.cpp
+@@ -618,6 +618,8 @@ static void WinCreate()
+         dbg( D_INFO ) << "Only SPIR-V shader artifacts present; biasing the "
+                       "GPU device toward Vulkan.";
+     }
++#  elif defined(__EMSCRIPTEN__)
++    SDL_SetHint( SDL_HINT_RENDER_DRIVER, "gpu,opengles2" );
+ #  else
+     SDL_SetHint( SDL_HINT_RENDER_DRIVER, "gpu,opengl" );
+ #  endif
+-- 
+2.51.0

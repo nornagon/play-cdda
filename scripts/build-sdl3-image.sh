@@ -13,13 +13,14 @@ emcc --use-port=sdl3 -x c /dev/null -c -o "$WORK_DIR/prime-sdl3.o"
 curl --fail --location --retry 3 \
     "https://github.com/libsdl-org/SDL_image/archive/refs/tags/release-${SDL_IMAGE_VERSION}.tar.gz" \
     --output "$WORK_DIR/sdl-image.tar.gz"
-printf '%s  %s\n' "$SDL_IMAGE_SHA256" "$WORK_DIR/sdl-image.tar.gz" | sha256sum --check --status
+SDL_IMAGE_ACTUAL_SHA256=$(sha256sum "$WORK_DIR/sdl-image.tar.gz" | awk '{ print $1 }')
+test "$SDL_IMAGE_ACTUAL_SHA256" = "$SDL_IMAGE_SHA256"
 mkdir "$WORK_DIR/source"
 tar -xzf "$WORK_DIR/sdl-image.tar.gz" -C "$WORK_DIR/source" --strip-components=1
 
 # Emscripten's experimental SDL3 port has a CMake config but no version config.
 # SDL_image performs its own target version check immediately afterward.
-sed -i 's/find_package(SDL3 ${SDL_REQUIRED_VERSION} REQUIRED/find_package(SDL3 REQUIRED/' \
+perl -pi -e 's/find_package\(SDL3 \$\{SDL_REQUIRED_VERSION\} REQUIRED/find_package(SDL3 REQUIRED/' \
     "$WORK_DIR/source/CMakeLists.txt"
 
 emcmake cmake -S "$WORK_DIR/source" -B "$WORK_DIR/build" \
