@@ -209,10 +209,29 @@
       const canvas = document.getElementById("canvas");
       const loadingMessage = document.getElementById("loading-message");
       const settingsMenu = document.getElementById("settings-menu");
+      let menuReady = false;
+      let tilesetDownloadActive = false;
 
       window.addEventListener("menuready", () => {
-        loadingMessage.style.display = "none";
+        menuReady = true;
+        if (!tilesetDownloadActive) {
+          loadingMessage.style.display = "none";
+        }
       });
+
+      window.beginTilesetDownload = (id, size) => {
+        tilesetDownloadActive = true;
+        loadingMessage.style.display = "block";
+        const sizeInMb = (size / 1024 / 1024).toFixed(1);
+        loadingMessage.textContent = `Downloading ${id} (${sizeInMb} MB)...`;
+      };
+
+      window.endTilesetDownload = () => {
+        tilesetDownloadActive = false;
+        if (menuReady) {
+          loadingMessage.style.display = "none";
+        }
+      };
 
       document.getElementById("settings-gear").onclick = () => {
         if (settingsMenu.style.display === "none") {
