@@ -18,3 +18,10 @@ test("readBuilds finds and sorts downloaded channel artifacts", async (t) => {
   const builds = await readBuilds(root);
   assert.deepEqual(builds.map((build) => build.metadata.channel), ["experimental", "stable"]);
 });
+
+test("readBuilds treats a missing artifact directory as no successful builds", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "play-cdda-test-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const builds = await readBuilds(path.join(root, "missing"));
+  assert.deepEqual(builds, []);
+});

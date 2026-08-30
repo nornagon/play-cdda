@@ -88,7 +88,13 @@ export default async function publish({ github, context, core, artifactsDir = "a
 }
 
 export async function readBuilds(artifactsDir) {
-  const entries = await fs.readdir(artifactsDir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await fs.readdir(artifactsDir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
   const builds = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
