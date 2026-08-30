@@ -1,0 +1,383 @@
+From 532075569751df49debb2852fc2632d8dc245912 Mon Sep 17 00:00:00 2001
+From: Jeremy Rose <nornagon@nornagon.net>
+Date: Sun, 30 Aug 2026 08:09:35 -0700
+Subject: [PATCH 1/2] Revive Emscripten browser build
+
+---
+ Makefile                          | 12 ++++++------
+ build-scripts/build-emscripten.sh | 17 ++++++++++-------
+ src/debug.cpp                     |  2 +-
+ src/do_turn.cpp                   |  4 ++--
+ src/emscripten_exception.cpp      |  2 +-
+ src/filesystem.cpp                |  4 ++--
+ src/game.cpp                      |  6 +++---
+ src/main.cpp                      | 10 +++++-----
+ src/main_menu.cpp                 |  8 ++++----
+ src/mapsharing.cpp                |  4 ++--
+ src/options.cpp                   |  4 ++--
+ src/sdltiles.cpp                  | 10 +++++-----
+ src/ui_manager.cpp                |  4 ++--
+ 13 files changed, 45 insertions(+), 42 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 22a31579fb..970ddf56ff 100644
+--- a/Makefile
++++ b/Makefile
+@@ -663,15 +663,16 @@ endif
+ 
+ # Emscripten
+ ifeq ($(NATIVE), emscripten)
+-  CXX=emcc
+-  LD=emcc
++  CC=emcc
++  CXX=em++
++  LD=em++
+   ifeq ($(CCACHE), 1)
+-    CXX=$(CCACHEBIN) emcc
+-    LD=$(CCACHEBIN) emcc
++    CC=$(CCACHEBIN) emcc
++    CXX=$(CCACHEBIN) em++
+   endif
+ 
+   # Flags that are common across compile and link phases.
+-  EMCC_COMMON_FLAGS = -sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -sUSE_SDL_TTF=2 -sSDL2_IMAGE_FORMATS=['png'] -fexceptions
++  EMCC_COMMON_FLAGS = -sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -sUSE_SDL_TTF=2 -sSDL2_IMAGE_FORMATS=['png'] -fexceptions -Wno-unused-but-set-global -Wno-unused-function -Wno-unused-template
+ 
+   ifneq ($(RELEASE), 1)
+     EMCC_COMMON_FLAGS += -g
+@@ -691,7 +692,6 @@ ifeq ($(NATIVE), emscripten)
+   LDFLAGS += -sENVIRONMENT=web
+   LDFLAGS += -lidbfs.js
+   LDFLAGS += -lembind
+-  LDFLAGS += -sWASM_BIGINT # Browser will require BigInt support.
+   LDFLAGS += -sMAX_WEBGL_VERSION=2
+ 
+   ifeq ($(RELEASE), 1)
+diff --git a/build-scripts/build-emscripten.sh b/build-scripts/build-emscripten.sh
+index 4f6a8348b9..5a9674c302 100755
+--- a/build-scripts/build-emscripten.sh
++++ b/build-scripts/build-emscripten.sh
+@@ -2,12 +2,15 @@
+ set -exo pipefail
+ 
+ CCACHE=${CCACHE:-0}
+-
+-emsdk install 3.1.51
+-emsdk activate 3.1.51
+-if [ "$CCACHE" == "1" ]
+-then
+-    emsdk activate ccache-git-emscripten-64bit
++EMSDK_VERSION=${EMSDK_VERSION:-6.0.8}
++if command -v nproc >/dev/null 2>&1; then
++    DEFAULT_JOBS=$(nproc)
++else
++    DEFAULT_JOBS=$(sysctl -n hw.logicalcpu)
+ fi
++JOBS=${JOBS:-$DEFAULT_JOBS}
+ 
+-make -j`nproc` NATIVE=emscripten BACKTRACE=0 TILES=1 TESTS=0 RUNTESTS=0 RELEASE=1 CCACHE="$CCACHE" LINTJSON=0 cataclysm-tiles.js
++emsdk install "$EMSDK_VERSION"
++emsdk activate "$EMSDK_VERSION"
++
++make -j"$JOBS" NATIVE=emscripten BACKTRACE=0 TILES=1 TESTS=0 RUNTESTS=0 RELEASE=1 CCACHE="$CCACHE" LINTJSON=0 cataclysm-tiles.js
+diff --git a/src/debug.cpp b/src/debug.cpp
+index 091ef4b443..6f9e7abf5f 100644
+--- a/src/debug.cpp
++++ b/src/debug.cpp
+@@ -1612,7 +1612,7 @@ std::string game_info::operating_system()
+ #endif
+ }
+ 
+-#if !defined(EMSCRIPTEN) && !defined(__CYGWIN__) && !defined (__ANDROID__) && ( defined (__linux__) || defined(unix) || defined(__unix__) || defined(__unix) || ( defined(__APPLE__) && defined(__MACH__) ) || defined(CATA_IS_ON_BSD) ) // linux; unix; MacOs; BSD
++#if !defined(__EMSCRIPTEN__) && !defined(__CYGWIN__) && !defined (__ANDROID__) && ( defined (__linux__) || defined(unix) || defined(__unix__) || defined(__unix) || ( defined(__APPLE__) && defined(__MACH__) ) || defined(CATA_IS_ON_BSD) ) // linux; unix; MacOs; BSD
+ class FILEDeleter
+ {
+     public:
+diff --git a/src/do_turn.cpp b/src/do_turn.cpp
+index a7011f84b7..a4c05e5536 100644
+--- a/src/do_turn.cpp
++++ b/src/do_turn.cpp
+@@ -1,6 +1,6 @@
+ #include "do_turn.h"
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ #include <emscripten.h>
+ #endif
+ 
+@@ -770,7 +770,7 @@ bool do_turn()
+     u.power_balance = u.get_power_level() - u.power_prev_turn;
+     u.power_prev_turn = u.get_power_level();
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     // This will cause a prompt to be shown if the window is closed, until the
+     // game is saved.
+     EM_ASM( window.game_unsaved = true; );
+diff --git a/src/emscripten_exception.cpp b/src/emscripten_exception.cpp
+index 573f180712..333df24991 100644
+--- a/src/emscripten_exception.cpp
++++ b/src/emscripten_exception.cpp
+@@ -1,4 +1,4 @@
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ #include <emscripten/bind.h>
+ 
+ std::string getExceptionMessage( intptr_t exceptionPtr )
+diff --git a/src/filesystem.cpp b/src/filesystem.cpp
+index a4a7e40588..2a95a00f6f 100644
+--- a/src/filesystem.cpp
++++ b/src/filesystem.cpp
+@@ -13,7 +13,7 @@
+ #include <type_traits>
+ #include <vector>
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ #include <emscripten.h>
+ #endif
+ 
+@@ -59,7 +59,7 @@ static const std::array invalid_names = {
+ 
+ static void setFsNeedsSync()
+ {
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     EM_ASM( window.setFsNeedsSync(); );
+ #endif
+ }
+diff --git a/src/game.cpp b/src/game.cpp
+index dc083dd4d2..156577ab33 100644
+--- a/src/game.cpp
++++ b/src/game.cpp
+@@ -32,7 +32,7 @@
+ #include <utility>
+ #include <vector>
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ #include <emscripten.h>
+ #endif
+ 
+@@ -2790,7 +2790,7 @@ input_context get_default_mode_input_context()
+     ctxt.register_action( "debug_mode" );
+     ctxt.register_action( "zoom_out" );
+     ctxt.register_action( "zoom_in" );
+-#if !defined(__ANDROID__) && !defined(EMSCRIPTEN)
++#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+     ctxt.register_action( "toggle_fullscreen" );
+ #endif
+     ctxt.register_action( "toggle_pixel_minimap" );
+@@ -3666,7 +3666,7 @@ bool game::save()
+                 fout.imbue( std::locale::classic() );
+                 fout << total_time_played.count();
+             } );
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+             // This will allow the window to be closed without a prompt, until do_turn()
+             // is called.
+             EM_ASM( window.game_unsaved = false; );
+diff --git a/src/main.cpp b/src/main.cpp
+index cd7b94e642..dd5b53863a 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -61,7 +61,7 @@
+ #include "ui_manager.h"
+ #include "cata_imgui.h"
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ #include <emscripten.h>
+ #endif
+ 
+@@ -572,7 +572,7 @@ bool assure_essential_dirs_exist()
+ 
+ }  // namespace
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ EM_ASYNC_JS( void, mount_idbfs, (), {
+     console.log( "Mounting IDBFS for persistence..." );
+     FS.mkdir( '/home/web_user/.cataclysm-dda' );
+@@ -632,7 +632,7 @@ int main( int argc, const char *argv[] )
+     flatbuffers::ClassicLocale::Get();
+ #endif
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     mount_idbfs();
+ #endif
+ 
+@@ -675,7 +675,7 @@ int main( int argc, const char *argv[] )
+ #if defined(__ANDROID__)
+     PATH_INFO::init_user_dir( external_storage_path );
+ #else
+-#   if defined(USE_HOME_DIR) || defined(USE_XDG_DIR) || defined(EMSCRIPTEN)
++#   if defined(USE_HOME_DIR) || defined(USE_XDG_DIR) || defined(__EMSCRIPTEN__)
+     PATH_INFO::init_user_dir( "" );
+ #   else
+     PATH_INFO::init_user_dir( "." );
+@@ -699,7 +699,7 @@ int main( int argc, const char *argv[] )
+         exit( 1 );
+     }
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     setupDebug( DebugOutput::std_err );
+ #else
+     setupDebug( DebugOutput::file );
+diff --git a/src/main_menu.cpp b/src/main_menu.cpp
+index 720696498c..611ac6709d 100644
+--- a/src/main_menu.cpp
++++ b/src/main_menu.cpp
+@@ -17,7 +17,7 @@
+ #include <optional>
+ #include <string>
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ #include <emscripten.h>
+ #endif
+ 
+@@ -464,7 +464,7 @@ void main_menu::init_strings()
+     vMenuItems.emplace_back( pgettext( "Main Menu", "Se<t|T>tings" ) );
+     vMenuItems.emplace_back( pgettext( "Main Menu", "H<e|E|?>lp" ) );
+     vMenuItems.emplace_back( pgettext( "Main Menu", "<C|c>redits" ) );
+-#if !defined(EMSCRIPTEN)
++#if !defined(__EMSCRIPTEN__)
+     vMenuItems.emplace_back( pgettext( "Main Menu", "<Q|q>uit" ) );
+ #endif
+ 
+@@ -651,7 +651,7 @@ bool main_menu::opening_screen()
+         }
+     }
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     EM_ASM( window.dispatchEvent( new Event( 'menuready' ) ); );
+ #endif
+ 
+@@ -744,7 +744,7 @@ bool main_menu::opening_screen()
+ 
+         // also check special keys
+         if( action == "QUIT" ) {
+-#if !defined(EMSCRIPTEN)
++#if !defined(__EMSCRIPTEN__)
+             if( query_yn( _( "Really quit?" ) ) ) {
+                 return false;
+             }
+diff --git a/src/mapsharing.cpp b/src/mapsharing.cpp
+index 7193efe126..bc406abd3a 100644
+--- a/src/mapsharing.cpp
++++ b/src/mapsharing.cpp
+@@ -16,7 +16,7 @@
+ #include "platform_win.h"
+ #endif
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ #include <emscripten.h>
+ #endif
+ 
+@@ -165,7 +165,7 @@ void ofstream_wrapper::close()
+         throw std::runtime_error( "moving temporary file \"" + temp_path.u8string() + "\" failed" );
+     }
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     EM_ASM( window.setFsNeedsSync(); );
+ #endif
+ }
+diff --git a/src/options.cpp b/src/options.cpp
+index a671b4a5a8..6364f8d013 100644
+--- a/src/options.cpp
++++ b/src/options.cpp
+@@ -2894,7 +2894,7 @@ void options_manager::add_options_debug()
+ 
+     add( "SKIP_VERIFICATION", "debug", to_translation( "Skip verification step during loading" ),
+          to_translation( "If enabled, this skips the JSON verification step during loading.  This may give a faster loading time, but risks JSON errors not being caught until runtime." ),
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+          true
+ #else
+          false
+@@ -3921,7 +3921,7 @@ std::string options_manager::show( bool ingame, const bool world_options_only, b
+     calendar::set_eternal_night( ::get_option<std::string>( "ETERNAL_TIME_OF_DAY" ) == "night" );
+     calendar::set_eternal_day( ::get_option<std::string>( "ETERNAL_TIME_OF_DAY" ) == "day" );
+ 
+-#if !defined(EMSCRIPTEN) && !defined(__ANDROID__) && !defined(TUI)
++#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__) && !defined(TUI)
+     if( terminal_size_changed ) {
+         int scaling_factor = get_scaling_factor();
+         point TERM( ::get_option<int>( "TERMINAL_X" ), ::get_option<int>( "TERMINAL_Y" ) );
+diff --git a/src/sdltiles.cpp b/src/sdltiles.cpp
+index 020cf3da80..a980234755 100644
+--- a/src/sdltiles.cpp
++++ b/src/sdltiles.cpp
+@@ -100,7 +100,7 @@ std::unique_ptr<cataimgui::client> imclient;
+ #include "worldfactory.h"
+ #endif
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ #include <emscripten.h>
+ #endif
+ 
+@@ -262,7 +262,7 @@ static void WinCreate()
+         SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, get_option<std::string>( "SCALING_MODE" ).c_str() );
+     }
+ 
+-#if !defined(__ANDROID__) && !defined(EMSCRIPTEN)
++#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+     if( get_option<std::string>( "FULLSCREEN" ) == "fullscreen" ) {
+         window_flags |= SDL_WINDOW_FULLSCREEN;
+         fullscreen = true;
+@@ -278,7 +278,7 @@ static void WinCreate()
+         window_flags |= SDL_WINDOW_MAXIMIZED;
+     }
+ #endif
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     // Without this, the game only displays in the top-left 1/4 of the window.
+     window_flags &= ~SDL_WINDOW_ALLOW_HIGHDPI;
+ #endif
+@@ -323,7 +323,7 @@ static void WinCreate()
+                                     ) );
+     throwErrorIf( !::window, "SDL_CreateWindow failed" );
+ 
+-#if !defined(__ANDROID__) && !defined(EMSCRIPTEN)
++#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+     // On Android SDL seems janky in windowed mode so we're fullscreen all the time.
+     // Fullscreen mode is now modified so it obeys terminal width/height, rather than
+     // overwriting it with this calculation.
+@@ -1850,7 +1850,7 @@ void resize_term( const int cell_w, const int cell_h )
+ void toggle_fullscreen_window()
+ {
+     // Can't enter fullscreen on Emscripten.
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     return;
+ #endif
+ 
+diff --git a/src/ui_manager.cpp b/src/ui_manager.cpp
+index 6a9031157d..a240be303e 100644
+--- a/src/ui_manager.cpp
++++ b/src/ui_manager.cpp
+@@ -12,7 +12,7 @@
+ #include "cursesdef.h"
+ #include "point.h"
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+ #include <emscripten.h>
+ #endif
+ 
+@@ -466,7 +466,7 @@ void ui_adaptor::redraw_invalidated( )
+             }
+         }
+     } while( restart_redrawing );
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     emscripten_sleep( 1 );
+ #endif
+ 

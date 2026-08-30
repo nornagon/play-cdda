@@ -1,0 +1,65 @@
+From f7dd8faa43aa62aa6610e89d445962853947aa6c Mon Sep 17 00:00:00 2001
+From: Jeremy Rose <nornagon@nornagon.net>
+Date: Sun, 30 Aug 2026 08:17:13 -0700
+Subject: [PATCH 3/3] Port Emscripten build to SDL3
+
+---
+ Makefile                          | 12 ++++++++++--
+ build-scripts/build-emscripten.sh | 16 +---------------
+ 2 files changed, 11 insertions(+), 17 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 2ba789e31c..76d654a7a4 100644
+--- a/Makefile
++++ b/Makefile
+@@ -700,7 +700,13 @@ ifeq ($(NATIVE), emscripten)
+   endif
+ 
+   # Flags that are common across compile and link phases.
+-  EMCC_COMMON_FLAGS = -sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -sUSE_SDL_TTF=2 -sSDL2_IMAGE_FORMATS=['png'] -fexceptions -Wno-unused-but-set-global -Wno-unused-function -Wno-unused-template
++  EMCC_COMMON_FLAGS = -sUSE_SDL=3 -sUSE_SDL_TTF=3 -fexceptions -Wno-error=experimental -Wno-unused-but-set-global -Wno-unused-function -Wno-unused-template
++
++  ifndef EMSCRIPTEN_SDL3_IMAGE_PREFIX
++    $(error EMSCRIPTEN_SDL3_IMAGE_PREFIX must point to a WebAssembly SDL3_image installation)
++  endif
++  CXXFLAGS += -isystem $(EMSCRIPTEN_SDL3_IMAGE_PREFIX)/include
++  LDFLAGS += -L$(EMSCRIPTEN_SDL3_IMAGE_PREFIX)/lib -lSDL3_image
+ 
+   ifneq ($(RELEASE), 1)
+     EMCC_COMMON_FLAGS += -g
+@@ -801,7 +807,9 @@ ifeq ($(TILES), 1)
+   # macOS FRAMEWORK builds resolve SDL3 via Apple framework lookup rather than
+   # pkg-config, so skip the version check there; non-framework macOS still
+   # uses pkg-config and gets the check.
+-  SDL3_DO_VERSION_CHECK := 1
++  ifneq ($(NATIVE),emscripten)
++    SDL3_DO_VERSION_CHECK := 1
++  endif
+   ifeq ($(NATIVE),osx)
+     ifdef FRAMEWORK
+       SDL3_DO_VERSION_CHECK :=
+diff --git a/build-scripts/build-emscripten.sh b/build-scripts/build-emscripten.sh
+index 69cbeec116..dfb1a9d889 100755
+--- a/build-scripts/build-emscripten.sh
++++ b/build-scripts/build-emscripten.sh
+@@ -1,19 +1,5 @@
+ #!/bin/bash
+-#
+-# UNSUPPORTED: this build cannot currently succeed.
+-#
+-# The target was abandoned in 2025. The PR CI leg was commented out on
+-# 2025-07-14 in commit f530407bda (PR #81827), and the release "WebAssembly
+-# Bundle" matrix entry is commented out as well.
+-#
+-# SDL2 support has since been removed, so the SDL flags this script relied on
+-# are gone from the Makefile. Emscripten does ship an SDL3 port (3.4.2) and an
+-# SDL3_ttf port, but no SDL3_image or SDL3_mixer port, so how to build tiles
+-# here is an open question.
+-#
+-# The script is kept deliberately, in the state it bit-rotted into, for anyone
+-# who wants to revive the path.
+-#
++# Build the SDL3 browser target with a pinned Emscripten SDK.
+ set -exo pipefail
+ 
+ CCACHE=${CCACHE:-0}

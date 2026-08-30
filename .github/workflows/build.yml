@@ -1,0 +1,178 @@
+name: Build and publish browser channels
+
+on:
+  schedule:
+    - cron: "40 10 * * *"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Channel to check
+        type: choice
+        options:
+          - all
+          - stable
+          - prerelease
+          - experimental
+        default: all
+      force:
+        description: Rebuild even when the channel is current
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: play-cdda-publisher
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.channels.outputs.matrix }}
+      has_builds: ${{ steps.channels.outputs.has_builds }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: channels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { default: discover } = await import('${{ github.workspace }}/discover.js')
+            await discover({
+              github,
+              context,
+              core,
+              requestedChannel: context.payload.inputs?.channel || 'all',
+              force: context.payload.inputs?.force === 'true',
+            })
+
+  build:
+    needs: discover
+    if: needs.discover.outputs.has_builds == 'true'
+    strategy:
+      # Stable and prerelease share a cache lineage; serial jobs let the release
+      # candidate reuse the stable compile instead of starting cold in parallel.
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out publisher
+        uses: actions/checkout@v4
+        with:
+          path: publisher
+      - name: Check out Cataclysm-DDA source
+        uses: actions/checkout@v4
+        with:
+          repository: CleverRaven/Cataclysm-DDA
+          ref: ${{ matrix.sourceSha }}
+          path: cdda
+          fetch-depth: 1
+      - name: Import matching precomposed tilesets
+        env:
+          TILESET_ASSET_URL: ${{ matrix.tilesetAssetUrl }}
+        run: |
+          mkdir release-graphics
+          curl --fail --location --retry 3 "$TILESET_ASSET_URL" --output release-graphics.tar.gz
+          tar -xzf release-graphics.tar.gz -C release-graphics --wildcards '*/gfx/*'
+          TILESET_ROOT=$(find release-graphics -type d -name gfx -print -quit)
+          test -n "$TILESET_ROOT"
+          cp -a "$TILESET_ROOT/." cdda/gfx/
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y ccache glslang-tools jq ninja-build
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.8
+          actions-cache-folder: emsdk-cache
+      - name: Apply downstream browser patch
+        env:
+          PATCH_FAMILY: ${{ matrix.patchFamily }}
+        run: |
+          for patch in "$GITHUB_WORKSPACE/publisher/patches/$PATCH_FAMILY/"*.patch; do
+            git -C cdda apply --index "$patch"
+          done
+      - name: Restore compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/ccache
+          key: wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-${{ matrix.sourceSha }}
+          restore-keys: |
+            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-
+      - name: Configure compiler cache
+        run: |
+          ccache --set-config=cache_dir="$GITHUB_WORKSPACE/.cache/ccache"
+          ccache --set-config=compiler_check=content
+          ccache --max-size=5G
+          ccache --zero-stats
+      - id: sdl3-image-cache
+        if: matrix.patchFamily == 'experimental'
+        uses: actions/cache@v4
+        with:
+          path: .cache/sdl3-image
+          key: sdl3-image-emscripten-6.0.8-3.4.4
+      - name: Build SDL3_image
+        if: matrix.patchFamily == 'experimental' && steps.sdl3-image-cache.outputs.cache-hit != 'true'
+        run: publisher/scripts/build-sdl3-image.sh "$GITHUB_WORKSPACE/.cache/sdl3-image"
+      - name: Build Cataclysm-DDA
+        working-directory: cdda
+        env:
+          CCACHE: 1
+          CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
+          CCACHE_COMPILERCHECK: content
+          EMSDK_VERSION: 6.0.8
+          EMSCRIPTEN_SDL3_IMAGE_PREFIX: ${{ github.workspace }}/.cache/sdl3-image
+        run: ./build-scripts/build-emscripten.sh
+      - name: Report compiler cache
+        if: always()
+        run: ccache --show-stats
+      - name: Package browser bundle
+        working-directory: cdda
+        run: ./build-scripts/prepare-web.sh
+      - name: Smoke test browser bundle
+        run: node publisher/scripts/smoke-bundle.mjs cdda/build
+      - name: Assemble publication artifact
+        env:
+          CHANNEL: ${{ matrix.channel }}
+          VERSION: ${{ matrix.version }}
+          TAG: ${{ matrix.tag }}
+          SOURCE_SHA: ${{ matrix.sourceSha }}
+          PATCHSET: ${{ matrix.patchsetId }}
+          UPSTREAM_PUBLISHED_AT: ${{ matrix.publishedAt }}
+        run: |
+          mkdir artifact
+          cp -a cdda/build/. artifact/
+          jq -n \
+            --arg channel "$CHANNEL" \
+            --arg version "$VERSION" \
+            --arg tag "$TAG" \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg patchset "$PATCHSET" \
+            --arg upstreamPublishedAt "$UPSTREAM_PUBLISHED_AT" \
+            '{channel: $channel, version: $version, tag: $tag, sourceSha: $sourceSha, patchset: $patchset, upstreamPublishedAt: $upstreamPublishedAt, builtAt: (now | todateiso8601)}' \
+            > artifact/build-metadata.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.channel }}
+          path: artifact
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    needs: [discover, build]
+    # Publish every channel that produced a complete artifact. A failure in one
+    # channel leaves its old pointer intact without blocking the other channels.
+    if: always() && needs.discover.outputs.has_builds == 'true' && needs.build.result != 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { default: publish } = await import('${{ github.workspace }}/publish.js')
+            await publish({ github, context, core })

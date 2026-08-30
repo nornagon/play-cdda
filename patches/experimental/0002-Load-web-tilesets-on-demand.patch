@@ -1,0 +1,254 @@
+From f82b230620e166f96398260a912fbbe23079ed3a Mon Sep 17 00:00:00 2001
+From: Jeremy Rose <nornagon@nornagon.net>
+Date: Sun, 30 Aug 2026 07:59:20 -0700
+Subject: [PATCH 2/3] Load web tilesets on demand
+
+---
+ build-data/web/index.html    | 30 ++++++++++++++-
+ build-scripts/prepare-web.sh | 72 ++++++++++++++++++++++++++++++++----
+ src/tileset_loader.cpp       | 62 +++++++++++++++++++++++++++++++
+ 3 files changed, 156 insertions(+), 8 deletions(-)
+
+diff --git a/build-data/web/index.html b/build-data/web/index.html
+index 08f29a4ba5..d5cd318273 100644
+--- a/build-data/web/index.html
++++ b/build-data/web/index.html
+@@ -188,11 +188,30 @@
+       const canvas = document.getElementById("canvas");
+       const loadingMessage = document.getElementById("loading-message");
+       const settingsMenu = document.getElementById("settings-menu");
++      let menuReady = false;
++      let tilesetDownloadActive = false;
+ 
+       window.addEventListener("menuready", () => {
+-        loadingMessage.style.display = "none";
++        menuReady = true;
++        if (!tilesetDownloadActive) {
++          loadingMessage.style.display = "none";
++        }
+       });
+ 
++      window.beginTilesetDownload = (id, size) => {
++        tilesetDownloadActive = true;
++        loadingMessage.style.display = "block";
++        const sizeInMb = (size / 1024 / 1024).toFixed(1);
++        loadingMessage.textContent = `Downloading ${id} (${sizeInMb} MB)...`;
++      };
++
++      window.endTilesetDownload = () => {
++        tilesetDownloadActive = false;
++        if (menuReady) {
++          loadingMessage.style.display = "none";
++        }
++      };
++
+       document.getElementById("settings-gear").onclick = () => {
+         if (settingsMenu.style.display === "none") {
+           settingsMenu.style.display = "inherit";
+@@ -264,6 +283,12 @@
+         })(),
+         setStatus: function (text) {
+           if (text) {
++            const progress = /^Downloading data\.\.\. \((\d+)\/(\d+)\)$/.exec(text);
++            if (progress) {
++              const downloaded = Number(progress[1]) / 1024 / 1024;
++              const total = Number(progress[2]) / 1024 / 1024;
++              text = `Downloading data... (${downloaded.toFixed(1)}/${total.toFixed(1)} MB)`;
++            }
+             loadingMessage.innerHTML = text;
+           } else {
+             loadingMessage.innerHTML = "Starting...";
+@@ -285,6 +310,9 @@
+               : "All downloads complete."
+           );
+         },
++        locateFile: function (path) {
++          return new URL(path, window.location.href).href;
++        },
+       };
+       Module.setStatus("Downloading...");
+       window.onerror = function (event, source, lineno, colno, error) {
+diff --git a/build-scripts/prepare-web.sh b/build-scripts/prepare-web.sh
+index 6aa235c876..91dfe4afb6 100755
+--- a/build-scripts/prepare-web.sh
++++ b/build-scripts/prepare-web.sh
+@@ -1,11 +1,15 @@
+ #!/bin/bash
+ set -exo pipefail
+ 
+-rm -rf web_bundle
++rm -rf web_bundle build
+ 
+ BUNDLE_DIR=web_bundle
+ DATA_DIR=$BUNDLE_DIR/data
++BUILD_DIR=build
++WEB_BUNDLED_TILESETS=${WEB_BUNDLED_TILESETS:-"ASCIITileset Larwick_Overmap"}
++FILE_PACKAGER=$EMSDK/upstream/emscripten/tools/file_packager
+ mkdir -p $DATA_DIR
++mkdir -p $BUILD_DIR
+ cp -R data/{core,font,fontdata.json,json,mods,names,raw,motd,credits,title} $DATA_DIR/
+ cp -R gfx $BUNDLE_DIR/
+ 
+@@ -23,15 +27,69 @@ done
+ 
+ echo "Removing MA mod..."
+ rm -rf $DATA_DIR/mods/MA
+-echo "Removing Ultica_iso tileset..."
+-rm -rf $BUNDLE_DIR/gfx/Ultica_iso
+ 
+-$EMSDK/upstream/emscripten/tools/file_packager cataclysm-tiles.data --js-output=cataclysm-tiles.data.js --no-node --preload "$BUNDLE_DIR""@/" --lz4
++is_bundled_tileset() {
++    local name=$1
++    local bundled
++    for bundled in $WEB_BUNDLED_TILESETS; do
++        if [ "$name" = "$bundled" ]; then
++            return 0
++        fi
++    done
++    return 1
++}
++
++TILESET_MANIFEST='{}'
++for TILESET_CONFIG in gfx/*/tileset.txt; do
++    [ -e "$TILESET_CONFIG" ] || continue
++
++    TILESET_DIR=$(dirname "$TILESET_CONFIG")
++    TILESET_DIR_NAME=$(basename "$TILESET_DIR")
++    if is_bundled_tileset "$TILESET_DIR_NAME"; then
++        continue
++    fi
++
++    TILESET_ID=$(sed -n 's/^NAME:[[:space:]]*//p' "$TILESET_CONFIG" | head -n 1 | tr -d '\r')
++    if [ -z "$TILESET_ID" ]; then
++        echo "Could not find NAME in $TILESET_CONFIG" >&2
++        exit 1
++    fi
++
++    PACKAGE_SUFFIX=$(printf '%s' "$TILESET_DIR_NAME" | sed 's/[^A-Za-z0-9._-]/_/g')
++    PACKAGE_DATA=tileset-$PACKAGE_SUFFIX.data
++    PACKAGE_MODULE=tileset-$PACKAGE_SUFFIX.mjs
++
++    echo "Packaging $TILESET_ID as an on-demand tileset..."
++    "$FILE_PACKAGER" "$BUILD_DIR/$PACKAGE_DATA" \
++        --js-output="$BUILD_DIR/$PACKAGE_MODULE" \
++        --no-node \
++        --export-es6 \
++        --preload "$TILESET_DIR@/gfx/$TILESET_DIR_NAME" \
++        --exclude '*/tileset.txt' \
++        --lz4
++
++    PACKAGE_SIZE=$(wc -c < "$BUILD_DIR/$PACKAGE_DATA" | tr -d ' ')
++    TILESET_MANIFEST=$(jq \
++        --arg id "$TILESET_ID" \
++        --arg module "$PACKAGE_MODULE" \
++        --argjson size "$PACKAGE_SIZE" \
++        '. + {($id): {module: $module, size: $size}}' \
++        <<< "$TILESET_MANIFEST")
++
++    # Keep the small descriptor in the core bundle so the tileset remains
++    # visible in the in-game options before its package has been downloaded.
++    rm -rf "$BUNDLE_DIR/gfx/$TILESET_DIR_NAME"
++    mkdir -p "$BUNDLE_DIR/gfx/$TILESET_DIR_NAME"
++    cp "$TILESET_CONFIG" "$BUNDLE_DIR/gfx/$TILESET_DIR_NAME/"
++done
++
++printf '%s\n' "$TILESET_MANIFEST" | jq --sort-keys . > "$BUILD_DIR/tilesets.json"
++
++"$FILE_PACKAGER" cataclysm-tiles.data --js-output=cataclysm-tiles.data.js --no-node --preload "$BUNDLE_DIR@/" --lz4
+ 
+-mkdir -p build/
+ cp \
+   build-data/web/index.html \
+   cataclysm-tiles.{data,data.js,js,wasm} \
+   data/font/Terminus.ttf \
+-  build
+-cp data/cataicon.ico build/favicon.ico
++  "$BUILD_DIR"
++cp data/cataicon.ico "$BUILD_DIR/favicon.ico"
+diff --git a/src/tileset_loader.cpp b/src/tileset_loader.cpp
+index 6298466937..b5a3cef8f0 100644
+--- a/src/tileset_loader.cpp
++++ b/src/tileset_loader.cpp
+@@ -21,6 +21,10 @@
+ #include <utility>
+ #include <vector>
+ 
++#if defined(__EMSCRIPTEN__)
++#include <emscripten.h>
++#endif
++
+ #include "cata_assert.h"
+ #include "cata_path.h"
+ #include "cata_scope_helpers.h"
+@@ -48,6 +52,58 @@
+ 
+ static const std::string ITEM_HIGHLIGHT( "highlight_item" );
+ 
++#if defined(__EMSCRIPTEN__)
++EM_ASYNC_JS( int, ensure_web_tileset_is_loaded, ( const char *tileset_id ), {
++    const id = UTF8ToString( tileset_id );
++    const locateFile = Module["locateFile"] || ( path => path );
++
++    try {
++        if( !globalThis.cddaTilesetManifestPromise ) {
++            globalThis.cddaTilesetManifestPromise = fetch( locateFile( "tilesets.json", "" ) )
++            .then( response => {
++                if( !response.ok ) {
++                    throw new Error( response.status + ": " + response.url );
++                }
++                return response.json();
++            } );
++        }
++
++        const manifest = await globalThis.cddaTilesetManifestPromise;
++        const packageInfo = manifest[id];
++        if( !packageInfo ) {
++            return 0;
++        }
++
++        if( !globalThis.cddaTilesetLoads ) {
++            globalThis.cddaTilesetLoads = new Map();
++        }
++        if( !globalThis.cddaTilesetLoads.has( id ) ) {
++            const loadPromise = ( async() => {
++                if( globalThis.beginTilesetDownload ) {
++                    globalThis.beginTilesetDownload( id, packageInfo.size );
++                }
++                try {
++                    const moduleUrl = locateFile( packageInfo.module, "" );
++                    const packageModule = await import( moduleUrl );
++                    await packageModule.default( Module );
++                } finally {
++                    if( globalThis.endTilesetDownload ) {
++                        globalThis.endTilesetDownload( id );
++                    }
++                }
++            } )();
++            globalThis.cddaTilesetLoads.set( id, loadPromise );
++        }
++
++        await globalThis.cddaTilesetLoads.get( id );
++        return 1;
++    } catch( error ) {
++        console.error( "Failed to load tileset " + id, error );
++        return -1;
++    }
++} );
++#endif
++
+ namespace
+ {
+ std::string get_ascii_tile_id( const uint32_t sym, const int FG, const int BG )
+@@ -331,6 +387,12 @@ atlas_upload_interrupt tileset_cache::loader::load( const std::string &tileset_i
+         const uint64_t renderer_instance_generation, const uint64_t gpu_textures_generation,
+         const atlas_upload_poll &poll, atlas_replay_quarantine *const quarantine )
+ {
++#if defined(__EMSCRIPTEN__)
++    if( ensure_web_tileset_is_loaded( tileset_id.c_str() ) < 0 ) {
++        throw std::runtime_error( "Failed to download tileset \"" + tileset_id + "\"" );
++    }
++#endif
++
+     std::string json_conf;
+     std::string layering;
+     std::string tileset_path;
