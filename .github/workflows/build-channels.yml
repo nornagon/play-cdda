@@ -20,6 +20,8 @@ jobs:
       matrix: ${{ fromJSON(inputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    env:
+      EMSDK_VERSION: 6.0.8
     steps:
       - name: Check out publisher
         uses: actions/checkout@v4
@@ -54,14 +56,30 @@ jobs:
       - name: Set up Emscripten
         uses: mymindstorm/setup-emsdk@v14
         with:
-          version: 6.0.8
+          version: ${{ env.EMSDK_VERSION }}
           actions-cache-folder: emsdk-cache
+      - name: Use deterministic Emscripten path
+        run: |
+          STABLE_EMSDK="$GITHUB_WORKSPACE/emsdk-cache/emsdk-main"
+          test -x "$STABLE_EMSDK/emsdk"
+          "$STABLE_EMSDK/emsdk" activate "$EMSDK_VERSION"
+          STABLE_EMSDK_NODE=$(find "$STABLE_EMSDK/node" -type f -path '*/bin/node' -print -quit)
+          test -n "$STABLE_EMSDK_NODE"
+          {
+            echo "$STABLE_EMSDK"
+            echo "$STABLE_EMSDK/upstream/emscripten"
+          } >> "$GITHUB_PATH"
+          {
+            echo "EMSDK=$STABLE_EMSDK"
+            echo "EMSDK_NODE=$STABLE_EMSDK_NODE"
+          } >> "$GITHUB_ENV"
       - name: Warm Emscripten ports
         # A cold parallel build otherwise races multiple em++ processes for
         # Emscripten's single-writer SDL_ttf/Freetype/HarfBuzz port cache.
         env:
           PATCH_FAMILY: ${{ matrix.patchFamily }}
         run: |
+          test "$(command -v em++)" = "$EMSDK/upstream/emscripten/em++"
           if [ "$PATCH_FAMILY" = experimental ]; then
             embuilder build sdl3_ttf
           else
@@ -78,17 +96,18 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .cache/ccache
-          key: wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: wasm-emscripten${{ env.EMSDK_VERSION }}-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-
-            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-
-            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-
-            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-
+            wasm-emscripten${{ env.EMSDK_VERSION }}-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-
+            wasm-emscripten${{ env.EMSDK_VERSION }}-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-
+            wasm-emscripten${{ env.EMSDK_VERSION }}-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-
+            wasm-emscripten${{ env.EMSDK_VERSION }}-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-
             wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-
       - name: Configure compiler cache
         run: |
           ccache --set-config=cache_dir="$GITHUB_WORKSPACE/.cache/ccache"
           ccache --set-config=compiler_check=content
+          ccache --set-config=base_dir="$GITHUB_WORKSPACE"
           ccache --max-size=5G
           ccache --zero-stats
       - id: sdl3-image-cache
@@ -106,9 +125,9 @@ jobs:
         env:
           BUILD_TARGET: emscripten-objects
           CCACHE: 1
+          CCACHE_BASEDIR: ${{ github.workspace }}
           CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
           CCACHE_COMPILERCHECK: content
-          EMSDK_VERSION: 6.0.8
           EMSCRIPTEN_SDL3_IMAGE_PREFIX: ${{ github.workspace }}/.cache/sdl3-image
         run: ./build-scripts/build-emscripten.sh
       - name: Save complete compiler cache checkpoint
@@ -116,20 +135,20 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .cache/ccache
-          key: wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: wasm-emscripten${{ env.EMSDK_VERSION }}-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Save partial compiler cache checkpoint
         if: always() && steps.compile.outcome == 'failure'
         uses: actions/cache/save@v4
         with:
           path: .cache/ccache
-          key: wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: wasm-emscripten${{ env.EMSDK_VERSION }}-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Link Cataclysm-DDA
         working-directory: cdda
         env:
           CCACHE: 1
+          CCACHE_BASEDIR: ${{ github.workspace }}
           CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
           CCACHE_COMPILERCHECK: content
-          EMSDK_VERSION: 6.0.8
           EMSCRIPTEN_SDL3_IMAGE_PREFIX: ${{ github.workspace }}/.cache/sdl3-image
         run: ./build-scripts/build-emscripten.sh
       - name: Report compiler cache
