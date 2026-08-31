@@ -33,6 +33,12 @@ export function selectTilesetAsset(release) {
     !asset.name.includes("and-sounds"));
 }
 
+export function partitionBuilds(include) {
+  const releases = include.filter((entry) => entry.channel !== "experimental");
+  const experimental = include.filter((entry) => entry.channel === "experimental");
+  return { releases, experimental };
+}
+
 /** @param {any} release */
 function releaseTime(release) {
   return +new Date(release.published_at || release.created_at || 0);
@@ -98,7 +104,11 @@ export default async function discover({ github, context, core, requestedChannel
     });
   }
 
-  core.setOutput("matrix", JSON.stringify({ include }));
+  const partitions = partitionBuilds(include);
+  core.setOutput("release_matrix", JSON.stringify({ include: partitions.releases }));
+  core.setOutput("experimental_matrix", JSON.stringify({ include: partitions.experimental }));
+  core.setOutput("has_release_builds", partitions.releases.length ? "true" : "false");
+  core.setOutput("has_experimental_builds", partitions.experimental.length ? "true" : "false");
   core.setOutput("has_builds", include.length ? "true" : "false");
   core.info(include.length
     ? `Will build: ${include.map((entry) => `${entry.channel}=${entry.tag}`).join(", ")}`

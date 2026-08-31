@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { selectChannels, selectTilesetAsset } from "../discover.js";
+import { partitionBuilds, selectChannels, selectTilesetAsset } from "../discover.js";
 import { patchsetForRelease } from "../channel-config.js";
 
 test("selectChannels separates stable, release candidate, and experimental", () => {
@@ -31,6 +31,16 @@ test("selectTilesetAsset chooses graphics without the sound bundle", () => {
     { name: "cdda-linux-with-graphics-x64-build.tar.gz", browser_download_url: "tiles" },
   ] });
   assert.equal(asset.browser_download_url, "tiles");
+});
+
+test("partitionBuilds gives releases a serial lane and experimental its own lane", () => {
+  const partitions = partitionBuilds([
+    { channel: "stable", tag: "0.I" },
+    { channel: "prerelease", tag: "cdda-0.I-current" },
+    { channel: "experimental", tag: "cdda-experimental-current" },
+  ]);
+  assert.deepEqual(partitions.releases.map((entry) => entry.channel), ["stable", "prerelease"]);
+  assert.deepEqual(partitions.experimental.map((entry) => entry.channel), ["experimental"]);
 });
 
 function release(tag_name, prerelease, published_at) {
