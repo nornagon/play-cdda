@@ -84,6 +84,7 @@ jobs:
             wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-
             wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-
             wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-
+            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-
       - name: Configure compiler cache
         run: |
           ccache --set-config=cache_dir="$GITHUB_WORKSPACE/.cache/ccache"
