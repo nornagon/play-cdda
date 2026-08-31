@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CDDA Web Publisher <noreply@example.com>
+Date: Sun, 30 Aug 2026 20:50:00 -0700
+Subject: [PATCH 5/5] Use JSPI for release browser builds
+
+Avoid Binaryen's whole-program Asyncify rewrite for stable and prerelease
+builds.  The same Emscripten 6.0.8 JSPI path used by experimental avoids the
+hour-long, memory-heavy release link.
+---
+ Makefile | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -675,7 +675,7 @@ ifeq ($(NATIVE), emscripten)
+   endif
+ 
+   # Flags that are common across compile and link phases.
+-  EMCC_COMMON_FLAGS = -sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -sUSE_SDL_TTF=2 -sSDL2_IMAGE_FORMATS=['png'] -fexceptions -Wno-unused-but-set-global -Wno-unused-function -Wno-unused-template
++  EMCC_COMMON_FLAGS = -sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -sUSE_SDL_TTF=2 -sSDL2_IMAGE_FORMATS=['png'] -fwasm-exceptions -Wno-unused-but-set-global -Wno-unused-function -Wno-unused-template
+ 
+   ifneq ($(RELEASE), 1)
+     EMCC_COMMON_FLAGS += -g
+@@ -691,8 +691,7 @@ ifeq ($(NATIVE), emscripten)
+   LDFLAGS += -sMAXIMUM_MEMORY=4GB
+   LDFLAGS += -sALLOW_MEMORY_GROWTH
+   LDFLAGS += -sSTACK_SIZE=262144
+-  LDFLAGS += -sASYNCIFY
+-  LDFLAGS += -sASYNCIFY_STACK_SIZE=16384
++  LDFLAGS += -sJSPI
+   LDFLAGS += -sENVIRONMENT=web
+   LDFLAGS += -lidbfs.js
+   LDFLAGS += -lembind
+-- 
+2.51.0

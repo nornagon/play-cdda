@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CDDA Web Publisher <noreply@example.com>
+Date: Sun, 30 Aug 2026 20:45:00 -0700
+Subject: [PATCH 10/10] Allow checkpointing before the Emscripten link
+
+Expose an object-only target and let the browser build script select it.  The
+publisher can then persist ccache after compilation, before linking.
+---
+ Makefile                          | 3 +++
+ build-scripts/build-emscripten.sh | 3 ++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -1187,5 +1187,8 @@ $(SHADERS_STAMP): $(SHADERS_SRC) tools/build_shaders.py
+ 	python3 tools/build_shaders.py --shader-dir $(SHADERS_DIR) --formats $(BUILD_SHADER_FORMATS) --stamp $@
+ endif
+ 
++.PHONY: emscripten-objects
++emscripten-objects: $(OBJS)
++
+ $(TARGET): $(OBJS) $(SHADERS_STAMP)
+ 	+$(LD) $(W32FLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)
+ ifeq ($(RELEASE), 1)
+diff --git a/build-scripts/build-emscripten.sh b/build-scripts/build-emscripten.sh
+--- a/build-scripts/build-emscripten.sh
++++ b/build-scripts/build-emscripten.sh
+@@ -11,8 +11,9 @@ else
+     DEFAULT_JOBS=$(sysctl -n hw.logicalcpu)
+ fi
+ JOBS=${JOBS:-$DEFAULT_JOBS}
++BUILD_TARGET=${BUILD_TARGET:-cataclysm-tiles.js}
+ 
+ emsdk install "$EMSDK_VERSION"
+ emsdk activate "$EMSDK_VERSION"
+ 
+-make -j"$JOBS" NATIVE=emscripten CLANG=1 BACKTRACE=0 TILES=1 TESTS=0 RUNTESTS=0 RELEASE=1 CCACHE="$CCACHE" LINTJSON=0 cataclysm-tiles.js
++make -j"$JOBS" NATIVE=emscripten CLANG=1 BACKTRACE=0 TILES=1 TESTS=0 RUNTESTS=0 RELEASE=1 CCACHE="$CCACHE" LINTJSON=0 "$BUILD_TARGET"
+-- 
+2.51.0
