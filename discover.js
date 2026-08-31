@@ -33,6 +33,10 @@ export function selectTilesetAsset(release) {
     !asset.name.includes("and-sounds"));
 }
 
+export function selectBuildableChannels(releases) {
+  return selectChannels(releases.filter((release) => selectTilesetAsset(release)));
+}
+
 export function partitionBuilds(include) {
   const releases = include.filter((entry) => entry.channel !== "experimental");
   const experimental = include.filter((entry) => entry.channel === "experimental");
@@ -63,7 +67,7 @@ export default async function discover({ github, context, core, requestedChannel
   // page, so always inject GitHub's canonical latest stable release.
   const releases = [latestStable, ...recentReleases.filter((release) =>
     release.id !== latestStable.id)];
-  const selected = selectChannels(releases);
+  const selected = selectBuildableChannels(releases);
   const currentManifest = await readManifest(github, context.repo);
   const wantedChannels = requestedChannel === "all" ? channelNames : [requestedChannel];
   const include = [];
