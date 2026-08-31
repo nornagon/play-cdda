@@ -32,6 +32,13 @@ jobs:
           ref: ${{ matrix.sourceSha }}
           path: cdda
           fetch-depth: 1
+      - name: Fetch source release tag
+        env:
+          SOURCE_SHA: ${{ matrix.sourceSha }}
+          SOURCE_TAG: ${{ matrix.tag }}
+        run: |
+          git -C cdda fetch --depth=1 origin "refs/tags/$SOURCE_TAG:refs/tags/$SOURCE_TAG"
+          test "$(git -C cdda rev-parse "$SOURCE_TAG^{commit}")" = "$SOURCE_SHA"
       - name: Import matching precomposed tilesets
         env:
           TILESET_ASSET_URL: ${{ matrix.tilesetAssetUrl }}
