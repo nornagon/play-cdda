@@ -2,7 +2,7 @@ const RELEASE_CACHE_PREFIX = 'game-data-release-v2-';
 const MAX_CACHED_RELEASES = 5;
 
 const CURRENT_CACHES = {
-  'harness': 'harness-v4',
+  'harness': 'harness-v5',
   'shared-game-data': 'shared-game-data-v3',
   'release-metadata': 'release-metadata-v2',
   'github-api': 'github-api-v1',

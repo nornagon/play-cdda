@@ -247,20 +247,35 @@
         if (versionFromQueryString) {
           return { version: versionFromQueryString, channel: null }
         }
+        let manifest
         try {
           const response = await fetch(`${DATA_ROOT}/channels.json`, { cache: 'no-cache' })
           if (!response.ok) throw new Error(`${response.status}: ${response.url}`)
-          const manifest = await response.json()
-          const channel = manifest.channels?.[requestedChannel]
-          if (!channel?.version) throw new Error(`No published ${requestedChannel} build`)
-          return { version: channel.version, channel: requestedChannel }
+          manifest = await response.json()
         } catch (error) {
+          if (requestedChannel !== 'experimental') {
+            throw new Error(`Unable to load the ${requestedChannel} channel manifest`, { cause: error })
+          }
           console.warn('Channel manifest unavailable; using the legacy latest build', error)
           return { version: await getLatestExperimental(), channel: 'experimental' }
         }
+
+        const channel = manifest.channels?.[requestedChannel]
+        if (!channel?.version) {
+          throw new Error(`No published ${requestedChannel} build yet`)
+        }
+        return { version: channel.version, channel: requestedChannel }
       }
 
-      const resolved = await resolveVersion()
+      let resolved
+      try {
+        resolved = await resolveVersion()
+      } catch (error) {
+        const message = document.getElementById('loading-message')
+        message.textContent = error.message
+        message.style.display = 'block'
+        throw error
+      }
       const version = resolved.version
       const canvas = document.getElementById("canvas");
       const loadingMessage = document.getElementById("loading-message");
