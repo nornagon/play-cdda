@@ -50,10 +50,16 @@ jobs:
           version: 6.0.8
           actions-cache-folder: emsdk-cache
       - name: Warm Emscripten ports
-        if: matrix.patchFamily == 'experimental'
         # A cold parallel build otherwise races multiple em++ processes for
         # Emscripten's single-writer SDL_ttf/Freetype/HarfBuzz port cache.
-        run: embuilder build sdl3_ttf
+        env:
+          PATCH_FAMILY: ${{ matrix.patchFamily }}
+        run: |
+          if [ "$PATCH_FAMILY" = experimental ]; then
+            embuilder build sdl3_ttf
+          else
+            embuilder build sdl2_ttf
+          fi
       - name: Apply downstream browser patch
         env:
           PATCH_FAMILY: ${{ matrix.patchFamily }}
