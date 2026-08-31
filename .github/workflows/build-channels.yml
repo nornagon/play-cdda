@@ -71,9 +71,12 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .cache/ccache
-          key: wasm-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}
+          key: wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-
+            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-
+            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-
+            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-
+            wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-
       - name: Configure compiler cache
         run: |
           ccache --set-config=cache_dir="$GITHUB_WORKSPACE/.cache/ccache"
@@ -90,6 +93,7 @@ jobs:
         if: matrix.patchFamily == 'experimental' && steps.sdl3-image-cache.outputs.cache-hit != 'true'
         run: publisher/scripts/build-sdl3-image.sh "$GITHUB_WORKSPACE/.cache/sdl3-image"
       - name: Compile Cataclysm-DDA
+        id: compile
         working-directory: cdda
         env:
           BUILD_TARGET: emscripten-objects
@@ -99,12 +103,18 @@ jobs:
           EMSDK_VERSION: 6.0.8
           EMSCRIPTEN_SDL3_IMAGE_PREFIX: ${{ github.workspace }}/.cache/sdl3-image
         run: ./build-scripts/build-emscripten.sh
-      - name: Save compiler cache checkpoint
-        if: always()
+      - name: Save complete compiler cache checkpoint
+        if: steps.compile.outcome == 'success'
         uses: actions/cache/save@v4
         with:
           path: .cache/ccache
-          key: wasm-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}
+          key: wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-complete-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Save partial compiler cache checkpoint
+        if: always() && steps.compile.outcome == 'failure'
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/ccache
+          key: wasm-${{ matrix.patchFamily }}${{ matrix.patchVersion }}-partial-${{ matrix.patchsetId }}-${{ matrix.sourceSha }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Link Cataclysm-DDA
         working-directory: cdda
         env:
