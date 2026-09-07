@@ -13,6 +13,12 @@ Each channel remains on its last successful build if compilation or smoke tests
 fail. Published bundles are immutable under `data:v/<version>/`; `channels.json`
 is updated atomically after every successful batch.
 
+Published builds are also listed in
+[`versions.json`](https://raw.githubusercontent.com/nornagon/play-cdda/data/versions.json).
+Its `build_number` is the upstream CDDA release tag used by CDDA Guide, and its
+`version` is the immutable Play CDDA directory name. Consumers should join on
+`build_number` and link to `?v=<version>`.
+
 The build uses Emscripten 6.0.8 and ccache. Stable and release candidates share
 the SDL2-era `0.I` patch, while current experimental builds use SDL3 plus a
 small static SDL3_image build.

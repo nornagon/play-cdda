@@ -207,7 +207,7 @@ jobs:
           git clone --filter=blob:none --depth=1 --no-checkout --single-branch --branch data \
             "https://github.com/$GITHUB_REPOSITORY.git" site
           git -C site sparse-checkout init --no-cone
-          git -C site sparse-checkout set channels.json
+          git -C site sparse-checkout set channels.json versions.json
           git -C site checkout data
       - uses: actions/download-artifact@v4
         with:

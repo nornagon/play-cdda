@@ -13,10 +13,12 @@ export default async function publish({ core, artifactsDir = "artifacts", siteDi
   }
 
   const manifest = await readManifest(siteDir);
+  let versions = await readVersions(siteDir);
 
   for (const build of builds) {
     validateName(build.metadata.channel, "channel");
     validateName(build.metadata.version, "version");
+    validateName(build.metadata.tag, "tag");
     core.startGroup(`Uploading ${build.metadata.channel}: ${build.metadata.version}`);
     for (const filename of await listFiles(build.directory)) {
       if (filename === "build-metadata.json") continue;
@@ -37,6 +39,7 @@ export default async function publish({ core, artifactsDir = "artifacts", siteDi
       upstreamPublishedAt: build.metadata.upstreamPublishedAt,
       builtAt: build.metadata.builtAt,
     };
+    versions = upsertVersion(versions, build.metadata);
   }
 
   manifest.schemaVersion = 1;
@@ -45,6 +48,33 @@ export default async function publish({ core, artifactsDir = "artifacts", siteDi
     path.join(siteDir, "channels.json"),
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
+  await fs.writeFile(
+    path.join(siteDir, "versions.json"),
+    `${JSON.stringify(versions, null, 2)}\n`,
+  );
+}
+
+/**
+ * Add a published browser build to the cdda-data-compatible version index.
+ * `build_number` is the upstream release tag used by CDDA Guide, while
+ * `version` is the immutable Play CDDA directory name.
+ *
+ * @param {Array<any>} versions
+ * @param {any} metadata
+ */
+export function upsertVersion(versions, metadata) {
+  const entry = {
+    build_number: metadata.tag,
+    version: metadata.version,
+    prerelease: metadata.channel !== "stable",
+    created_at: metadata.upstreamPublishedAt,
+    built_at: metadata.builtAt,
+  };
+  return [entry, ...versions.filter((version) => version.version !== entry.version)]
+    .sort((a, b) =>
+      (b.created_at || "").localeCompare(a.created_at || "") ||
+      (b.built_at || "").localeCompare(a.built_at || "") ||
+      a.version.localeCompare(b.version));
 }
 
 export async function readBuilds(artifactsDir) {
@@ -89,6 +119,21 @@ async function readManifest(siteDir) {
     return { ...parsed, channels: parsed.channels || {} };
   } catch (error) {
     if (error.code === "ENOENT") return { channels: {} };
+    throw error;
+  }
+}
+
+async function readVersions(siteDir) {
+  try {
+    const parsed = JSON.parse(
+      await fs.readFile(path.join(siteDir, "versions.json"), "utf8"),
+    );
+    if (!Array.isArray(parsed)) {
+      throw new Error("versions.json must contain an array");
+    }
+    return parsed;
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
     throw error;
   }
 }

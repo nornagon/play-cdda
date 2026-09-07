@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import publish, { readBuilds } from "../publish.js";
+import publish, { readBuilds, upsertVersion } from "../publish.js";
 
 test("readBuilds finds and sorts downloaded channel artifacts", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "play-cdda-test-"));
@@ -37,6 +37,15 @@ test("publish copies a browser bundle into a local data-branch checkout", async 
   await fs.writeFile(path.join(siteDir, "channels.json"), JSON.stringify({
     channels: { stable: { version: "stable-old" } },
   }));
+  await fs.writeFile(path.join(siteDir, "versions.json"), JSON.stringify([
+    {
+      build_number: "0.I",
+      version: "stable-old",
+      prerelease: false,
+      created_at: "2026-06-06T00:00:00Z",
+      built_at: "2026-08-29T00:00:00Z",
+    },
+  ]));
   await fs.writeFile(path.join(buildDir, "game.wasm"), "wasm");
   await fs.writeFile(path.join(buildDir, "nested", "asset.txt"), "asset");
   await fs.writeFile(path.join(buildDir, "build-metadata.json"), JSON.stringify({
@@ -61,4 +70,43 @@ test("publish copies a browser bundle into a local data-branch checkout", async 
   const manifest = JSON.parse(await fs.readFile(path.join(siteDir, "channels.json"), "utf8"));
   assert.equal(manifest.channels.stable.version, "stable-old");
   assert.equal(manifest.channels.experimental.version, "experimental-new");
+  const versions = JSON.parse(await fs.readFile(path.join(siteDir, "versions.json"), "utf8"));
+  assert.deepEqual(versions.map(({ build_number, version }) => ({ build_number, version })), [
+    { build_number: "cdda-experimental-new", version: "experimental-new" },
+    { build_number: "0.I", version: "stable-old" },
+  ]);
+});
+
+test("upsertVersion replaces a rebuild without losing other versions", () => {
+  const versions = upsertVersion([
+    {
+      build_number: "cdda-experimental-one",
+      version: "one-web-patch",
+      prerelease: true,
+      created_at: "2026-08-30T00:00:00Z",
+      built_at: "2026-08-30T01:00:00Z",
+    },
+    {
+      build_number: "0.I",
+      version: "0.I-web-patch",
+      prerelease: false,
+      created_at: "2026-06-06T00:00:00Z",
+      built_at: "2026-08-29T00:00:00Z",
+    },
+  ], {
+    channel: "experimental",
+    tag: "cdda-experimental-one",
+    version: "one-web-patch",
+    upstreamPublishedAt: "2026-08-30T00:00:00Z",
+    builtAt: "2026-09-01T01:00:00Z",
+  });
+
+  assert.equal(versions.length, 2);
+  assert.deepEqual(versions[0], {
+    build_number: "cdda-experimental-one",
+    version: "one-web-patch",
+    prerelease: true,
+    created_at: "2026-08-30T00:00:00Z",
+    built_at: "2026-09-01T01:00:00Z",
+  });
 });
