@@ -1,7 +1,7 @@
-From d4450e4a135f1b1e2ecb6556960baed1b100d2d4 Mon Sep 17 00:00:00 2001
+From a08a0a10cba8a2fc246e042d154ab5e3eb47e40a Mon Sep 17 00:00:00 2001
 From: Jeremy Rose <nornagon@nornagon.net>
-Date: Sun, 30 Aug 2026 07:58:33 -0700
-Subject: [PATCH 1/3] Revive Emscripten browser build
+Date: Fri, 2 Oct 2026 10:02:24 -0700
+Subject: [PATCH] Revive Emscripten browser build
 
 ---
  Makefile                          | 16 ++++++----------
@@ -116,7 +116,7 @@ index 4e3c3a5c9c..11875474a9 100644
  {
  class FILEDeleter
 diff --git a/src/do_turn.cpp b/src/do_turn.cpp
-index 2a6eb9e3c0..db45af37da 100644
+index d3ac209fd4..647d7c40f4 100644
 --- a/src/do_turn.cpp
 +++ b/src/do_turn.cpp
 @@ -1,6 +1,6 @@
@@ -127,7 +127,7 @@ index 2a6eb9e3c0..db45af37da 100644
  #include <emscripten.h>
  #endif
  
-@@ -794,7 +794,7 @@ bool game::do_turn()
+@@ -795,7 +795,7 @@ bool game::do_turn()
      u.power_balance = u.get_power_level() - u.power_prev_turn;
      u.power_prev_turn = u.get_power_level();
  
@@ -169,7 +169,7 @@ index 1bd75630fe..fd5dad92f5 100644
  #endif
  }
 diff --git a/src/game.cpp b/src/game.cpp
-index 5adf2563b6..eeed7ceb60 100644
+index 498f5c8462..3335f3a91d 100644
 --- a/src/game.cpp
 +++ b/src/game.cpp
 @@ -34,7 +34,7 @@
@@ -181,7 +181,7 @@ index 5adf2563b6..eeed7ceb60 100644
  #include <emscripten.h>
  #endif
  
-@@ -2677,7 +2677,7 @@ input_context get_default_mode_input_context()
+@@ -2694,7 +2694,7 @@ input_context get_default_mode_input_context()
          ctxt.register_action( "debug_mode" );
          ctxt.register_action( "zoom_out" );
          ctxt.register_action( "zoom_in" );
@@ -215,7 +215,7 @@ index d170ad4b66..e7125a9952 100644
              // is called.
              EM_ASM( window.game_unsaved = false; );
 diff --git a/src/main.cpp b/src/main.cpp
-index 187b87333f..e691c90483 100644
+index a5f96b9973..e423d936b0 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
 @@ -66,7 +66,7 @@
@@ -229,23 +229,14 @@ index 187b87333f..e691c90483 100644
  
 @@ -575,7 +575,7 @@ bool assure_essential_dirs_exist()
  
- }  // namespace
+ } // namespace
  
 -#if defined(EMSCRIPTEN)
 +#if defined(__EMSCRIPTEN__)
  EM_ASYNC_JS( void, mount_idbfs, (), {
      console.log( "Mounting IDBFS for persistence..." );
      FS.mkdir( '/home/web_user/.cataclysm-dda' );
-@@ -638,7 +638,7 @@ int main( int argc, const char *argv[] )
-     flatbuffers::ClassicLocale::Get();
- #endif
- 
--#if defined(EMSCRIPTEN)
-+#if defined(__EMSCRIPTEN__)
-     mount_idbfs();
- #endif
- 
-@@ -681,7 +681,7 @@ int main( int argc, const char *argv[] )
+@@ -671,7 +671,7 @@ void initialize_default_paths()
  #if defined(__ANDROID__)
      PATH_INFO::init_user_dir( external_storage_path );
  #else
@@ -254,17 +245,26 @@ index 187b87333f..e691c90483 100644
      PATH_INFO::init_user_dir( "" );
  #   else
      PATH_INFO::init_user_dir( "." );
-@@ -705,7 +705,7 @@ int main( int argc, const char *argv[] )
-         exit( 1 );
-     }
+@@ -697,7 +697,7 @@ void validate_directories()
  
+ void initialize_debugging()
+ {
 -#if defined(EMSCRIPTEN)
 +#if defined(__EMSCRIPTEN__)
      setupDebug( DebugOutput::std_err );
  #else
      setupDebug( DebugOutput::file );
+@@ -901,7 +901,7 @@ int main( int argc, const char *argv[] )
+ 
+     initialize_runtime();
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     mount_idbfs();
+ #endif
+ 
 diff --git a/src/main_menu.cpp b/src/main_menu.cpp
-index 909d572d2c..04f6499f60 100644
+index ea6f117cdc..87b778f857 100644
 --- a/src/main_menu.cpp
 +++ b/src/main_menu.cpp
 @@ -17,7 +17,7 @@
@@ -326,10 +326,10 @@ index 7193efe126..bc406abd3a 100644
  #endif
  }
 diff --git a/src/options.cpp b/src/options.cpp
-index 2db88707be..4b64007532 100644
+index 234d17ccdb..386b797aa0 100644
 --- a/src/options.cpp
 +++ b/src/options.cpp
-@@ -2937,7 +2937,7 @@ void options_manager::add_options_debug()
+@@ -2961,7 +2961,7 @@ void options_manager::add_options_debug()
  
      add( "SKIP_VERIFICATION", "debug", to_translation( "Skip verification step during loading" ),
           to_translation( "If enabled, this skips the JSON verification step during loading.  This may give a faster loading time, but risks JSON errors not being caught until runtime." ),
@@ -338,7 +338,7 @@ index 2db88707be..4b64007532 100644
           true
  #else
           false
-@@ -3995,7 +3995,7 @@ std::string options_manager::show( bool ingame, const bool world_options_only, b
+@@ -4031,7 +4031,7 @@ std::string options_manager::show( bool ingame, const bool world_options_only, b
      calendar::set_eternal_night( ::get_option<std::string>( "ETERNAL_TIME_OF_DAY" ) == "night" );
      calendar::set_eternal_day( ::get_option<std::string>( "ETERNAL_TIME_OF_DAY" ) == "day" );
  
@@ -348,10 +348,10 @@ index 2db88707be..4b64007532 100644
          int scaling_factor = get_scaling_factor();
          point TERM( ::get_option<int>( "TERMINAL_X" ), ::get_option<int>( "TERMINAL_Y" ) );
 diff --git a/src/sdltiles.cpp b/src/sdltiles.cpp
-index 556bdc5a53..cb757688ed 100644
+index 27512adad6..2b6497788a 100644
 --- a/src/sdltiles.cpp
 +++ b/src/sdltiles.cpp
-@@ -99,7 +99,7 @@ std::unique_ptr<cataimgui::client> imclient;
+@@ -101,7 +101,7 @@ std::unique_ptr<cataimgui::client> imclient;
  #include "worldfactory.h"
  #endif
  
@@ -360,7 +360,7 @@ index 556bdc5a53..cb757688ed 100644
  #include <emscripten.h>
  #endif
  
-@@ -515,7 +515,7 @@ static void WinCreate()
+@@ -585,7 +585,7 @@ static void WinCreate()
      // Track desired fullscreen mode separately; applied after window creation
      FullscreenMode desired_fullscreen = FullscreenMode::windowed;
  
@@ -369,7 +369,7 @@ index 556bdc5a53..cb757688ed 100644
      if( get_option<std::string>( "FULLSCREEN" ) == "fullscreen" ) {
          desired_fullscreen = FullscreenMode::fullscreen_exclusive;
          fullscreen = true;
-@@ -531,7 +531,7 @@ static void WinCreate()
+@@ -601,7 +601,7 @@ static void WinCreate()
          window_flags |= CATA_WINDOW_MAXIMIZED;
      }
  #endif
@@ -378,7 +378,7 @@ index 556bdc5a53..cb757688ed 100644
      // Without this, the game only displays in the top-left 1/4 of the window.
      window_flags &= ~CATA_WINDOW_HIGH_DPI;
  #endif
-@@ -575,7 +575,7 @@ static void WinCreate()
+@@ -645,7 +645,7 @@ static void WinCreate()
          SetWindowFullscreen( ::window.get(), desired_fullscreen );
      }
  
@@ -387,7 +387,7 @@ index 556bdc5a53..cb757688ed 100644
      // On Android SDL seems janky in windowed mode so we're fullscreen all the time.
      // Fullscreen mode is now modified so it obeys terminal width/height, rather than
      // overwriting it with this calculation.
-@@ -4000,7 +4000,7 @@ void resize_term( const int cell_w, const int cell_h )
+@@ -4270,7 +4270,7 @@ void resize_term( const int cell_w, const int cell_h )
  void toggle_fullscreen_window()
  {
      // Can't enter fullscreen on Emscripten.
@@ -418,3 +418,6 @@ index bcc247b924..9ed6342037 100644
      emscripten_sleep( 1 );
  #endif
  
+-- 
+2.50.1 (Apple Git-155)
+

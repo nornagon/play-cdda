@@ -26,6 +26,7 @@ test("selectChannels separates stable, release candidate, and experimental", () 
 
 test("0.I releases use the legacy patch while future releases follow experimental", () => {
   assert.equal(patchsetForRelease("stable", "0.I").family, "0-i");
+  assert.equal(patchsetForRelease("stable", "0.I-1").family, "0-i");
   assert.equal(patchsetForRelease("prerelease", "cdda-0.I-2026-08-29").family, "0-i");
   assert.equal(patchsetForRelease("stable", "0.J").family, "experimental");
 });
