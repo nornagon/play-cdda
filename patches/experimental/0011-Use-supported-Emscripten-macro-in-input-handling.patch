@@ -1,0 +1,28 @@
+From: Jeremy Rose <nornagon@nornagon.net>
+Subject: [PATCH] Use supported Emscripten macro in input handling
+
+The upstream input wait refactor added two more platform guards using the
+deprecated EMSCRIPTEN macro. Use __EMSCRIPTEN__ so Emscripten 6.0.8 can
+compile with warnings treated as errors.
+
+diff --git a/src/sdltiles.cpp b/src/sdltiles.cpp
+--- a/src/sdltiles.cpp
++++ b/src/sdltiles.cpp
+@@ -6557,7 +6557,7 @@
+ 
+ // This is how we're actually going to handle input events, SDL getch
+ // is simply a wrapper around this.
+-#if !defined(EMSCRIPTEN)
++#if !defined(__EMSCRIPTEN__)
+ // time until next android touch timer CheckMessages checks, from its file statics
+ static std::optional<uint32_t> android_touch_wait_ms( const uint32_t now )
+ {
+@@ -6637,7 +6637,7 @@
+         try_sdl_update();
+     }
+ 
+-#if defined(EMSCRIPTEN)
++#if defined(__EMSCRIPTEN__)
+     // emscripten must yield to the browser through Asyncify, which SDL_Delay does
+     if( inputdelay < 0 ) {
+         do {
