@@ -6,12 +6,15 @@ Subject: [PATCH 8/8] Render large loading images in small quads
 SDL's browser software renderer rejects the two large triangles emitted by
 ImGui::Image with "triangle area overflow".  Draw the same image as a grid of
 small textured quads and retry its renderer-owned texture after recovery.
+
+Refreshed for upstream 26358549bc: retain its resize-aware layout and
+zero-size image guard.
 ---
  src/loading_ui.cpp | 48 ++++++++++++++++++++++++++++++++++++++++++++----
  1 file changed, 44 insertions(+), 4 deletions(-)
 
 diff --git a/src/loading_ui.cpp b/src/loading_ui.cpp
-index c04e7deddf..b386e88cfc 100644
+index 315a7f9131..7906516817 100644
 --- a/src/loading_ui.cpp
 +++ b/src/loading_ui.cpp
 @@ -1,5 +1,7 @@
@@ -22,10 +25,10 @@ index c04e7deddf..b386e88cfc 100644
  #include "cached_options.h"
  #include "input.h"
  #include "options.h"
-@@ -69,7 +71,26 @@ static void redraw()
+@@ -72,7 +74,26 @@ static void redraw()
          const float image_start_pos_x = center_x - ( gLUI->splash_size.x / 2 );
          ImGui::SetCursorPosX( image_start_pos_x );
-         if( gLUI->splash ) {
+         if( gLUI->splash && gLUI->splash_size.x > 0.0f ) {
 -            ImGui::Image( reinterpret_cast<ImTextureID>( gLUI->splash.get() ), gLUI->splash_size );
 +            // SDL's software renderer rejects the two very large triangles made
 +            // by ImGui::Image with "triangle area overflow".  Split the image
@@ -50,17 +53,17 @@ index c04e7deddf..b386e88cfc 100644
          }
  
          // hint
-@@ -211,9 +232,6 @@ static void update_state( const std::string &context, const std::string &step )
-                               static_cast<float>( surf->h ) / longest_side_ratio
-                             };
+@@ -230,9 +251,6 @@ static void update_state( const std::string &context, const std::string &step )
+         gLUI->img_w = surf->w;
+         gLUI->img_h = surf->h;
          if( !renderer_should_abort_frame() ) {
 -            // Skip the upload when recovery is queued: it would invalidate the
 -            // texture. The splash stays absent for this load rather than uploading
 -            // against a renderer about to be rebuilt.
              gLUI->splash = CreateTextureFromSurface( get_sdl_renderer(), surf );
          }
-         gLUI->window_size = gLUI->splash_size + ImVec2{ 0.0f, 2.0f * ImGui::GetTextLineHeightWithSpacing() };
-@@ -236,13 +254,35 @@ static void update_state( const std::string &context, const std::string &step )
+         layout();
+@@ -255,13 +273,35 @@ static void update_state( const std::string &context, const std::string &step )
      gLUI->step = std::string( step );
  }
  
