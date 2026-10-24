@@ -1,0 +1,62 @@
+{
+  "ASCII_Overmap": {
+    "module": "tileset-ASCII_Overmap.mjs",
+    "size": 113655
+  },
+  "Alternative Ultica": {
+    "module": "tileset-Altica.mjs",
+    "size": 4842094
+  },
+  "Chibi_Ultica": {
+    "module": "tileset-ChibiUltica.mjs",
+    "size": 6198348
+  },
+  "Cuteclysm": {
+    "module": "tileset-Cuteclysm.mjs",
+    "size": 780732
+  },
+  "Hollow Moon": {
+    "module": "tileset-HollowMoon.mjs",
+    "size": 1275830
+  },
+  "MshockXottoplus": {
+    "module": "tileset-MshockXotto_.mjs",
+    "size": 4759912
+  },
+  "PenAndPaper": {
+    "module": "tileset-PenAndPaper.mjs",
+    "size": 7837027
+  },
+  "SmashButton_iso": {
+    "module": "tileset-SmashButton_iso.mjs",
+    "size": 286178
+  },
+  "SurveyorsMap": {
+    "module": "tileset-SurveyorsMap.mjs",
+    "size": 681993
+  },
+  "Ultica_iso": {
+    "module": "tileset-Ultica_iso.mjs",
+    "size": 17794317
+  },
+  "UltimateCataclysm": {
+    "module": "tileset-UltimateCataclysm.mjs",
+    "size": 4973263
+  },
+  "brownlikebears": {
+    "module": "tileset-BrownLikeBears.mjs",
+    "size": 448596
+  },
+  "giantdays": {
+    "module": "tileset-GiantDays.mjs",
+    "size": 598052
+  },
+  "neodays": {
+    "module": "tileset-NeoDaysTileset.mjs",
+    "size": 404412
+  },
+  "retrodays": {
+    "module": "tileset-RetroDaysTileset.mjs",
+    "size": 248174
+  }
+}
