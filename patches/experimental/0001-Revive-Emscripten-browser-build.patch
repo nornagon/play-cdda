@@ -316,8 +316,8 @@ index 7193efe126..bc406abd3a 100644
  #include <emscripten.h>
  #endif
  
-@@ -165,7 +165,7 @@ void ofstream_wrapper::close()
-         throw std::runtime_error( "moving temporary file \"" + temp_path.u8string() + "\" failed" );
+@@ -166,7 +166,7 @@ void ofstream_wrapper::close()
+                                                from_u8string( temp_path.u8string() ) ) );
      }
  
 -#if defined(EMSCRIPTEN)
