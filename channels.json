@@ -1,0 +1,30 @@
+{
+  "channels": {
+    "experimental": {
+      "version": "cdda-experimental-2026-11-14-0749-web-experimental1-0a67438467",
+      "tag": "cdda-experimental-2026-11-14-0749",
+      "sourceSha": "7136388ca55f1917de99c74a31ff5955d719a50d",
+      "patchset": "experimental1-0a67438467",
+      "upstreamPublishedAt": "2026-11-14T07:49:33Z",
+      "builtAt": "2026-11-14T16:48:03Z"
+    },
+    "prerelease": {
+      "version": "cdda-0.I-2026-09-19-2324-web-0-i1-e526f4835d",
+      "tag": "cdda-0.I-2026-09-19-2324",
+      "sourceSha": "7b2efa5cea38e4d4d97dd0e63b28b9148623da59",
+      "patchset": "0-i1-e526f4835d",
+      "upstreamPublishedAt": "2026-09-19T23:25:01Z",
+      "builtAt": "2026-09-20T14:39:10Z"
+    },
+    "stable": {
+      "version": "0.I-1-web-0-i1-e526f4835d",
+      "tag": "0.I-1",
+      "sourceSha": "7b2efa5cea38e4d4d97dd0e63b28b9148623da59",
+      "patchset": "0-i1-e526f4835d",
+      "upstreamPublishedAt": "2026-09-20T10:46:58Z",
+      "builtAt": "2026-10-02T17:23:37Z"
+    }
+  },
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-14T16:48:27.755Z"
+}
